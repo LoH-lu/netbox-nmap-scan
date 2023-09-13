@@ -1,5 +1,7 @@
 # netbox-ping-scan
 
+Tested and working with Python 3.11 and Netbox 3.5.x - 3.6.x
+
 1. Initializes a session with NetBox API
 2. Retrieves a list of active IP prefixes from NetBox with custom tag "toscan".
 3. Iterates through each active prefix and checks each IP address within the prefix.
