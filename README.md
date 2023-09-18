@@ -1,6 +1,7 @@
 # netbox-ping-scan
 
 This is a simple Python script that achieve the purpose of keeping an updated list of IP Address which are active/responding in your network.
+Just create a new tag 'toscan' and assign it to the Prefixes you want to monitor.
 Only IP added with the tag "autoscan" will be modified, as long you don't have this tag, the script will not touch your existing manual IP.
 Anyway, even with the tag, it will only update the status of the IP Address.
 
