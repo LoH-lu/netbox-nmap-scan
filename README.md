@@ -8,7 +8,7 @@ If you don't want a prefix to get scan, create a new tag 'Disable Automatic Scan
 
 ![image](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/b7a223ae-3a55-42cb-8f28-87d282e103c8)
 
-Create as well the tag 'autoscan', this will allow you to quickly know which IP Addresses has been created by the script.
+Create as well the tag 'autoscan', this will allow you to quickly know which IP Addresses has been added by the script.
 
 ![image](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/435cec58-1f92-42f2-b4eb-1448a4d22161)
 
