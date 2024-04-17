@@ -1,20 +1,17 @@
-# netbox-ping-scan
+# netbox-nmap-scan
 
-This is a simple Python script that achieve the purpose of keeping an updated list of IP Address which are active/responding in your network.
-Just create a new tag 'toscan' and assign it to the Prefixes you want to monitor.
-Only IP added with the tag "autoscan" will be modified, as long you don't have this tag, the script will not touch your existing manual IP.
-Anyway, even with the tag, it will only update the status of the IP Address.
+This is a simple Python scripts that achieve the purpose of keeping an updated list of IP Address which are active/responding in your network.
+To achieve that we are using nmap.
 
-If you have a lot of Prefixes to scan, the script will take a long time to finish. Because it is scanning each IP one by one and send the result to Netbox one by one as well.
-I'm working on a new version that will run multiple ping at once and keep them in a database/list and push all the changes at once to Netbox.
+By default the scripts is scanning all prefixes with the active status inside your Netbox instance.
+If you don't want a prefix to get scan, create a new tag 'Disable Automatic Scanning'
+![image](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/b7a223ae-3a55-42cb-8f28-87d282e103c8)
 
-Tested and working with Python 3.11 and Netbox 3.5.x - 3.6.x
+Create as well the tag 'autoscan', this will allow you to quickly know which IP Addresses has been created by the script.
+![image](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/435cec58-1f92-42f2-b4eb-1448a4d22161)
 
-1. Initializes a session with NetBox API
-2. Retrieves a list of active IP prefixes from NetBox with custom tag "toscan".
-3. Iterates through each active prefix and checks each IP address within the prefix.
-4. If an IP address is pingable and have custom tag "autoscan", it checks if the IP address exists in NetBox.
-  - If the IP address does not exist, it creates the IP address in NetBox with the specified details.
-  - If the IP address exists, it updates the status of the IP address to 'active' if necessary.
-5. If an IP address is not pingable, it checks if the IP address exists in NetBox.
-  - If the IP address exists and is not pingable, it updates the status of the IP address to 'deprecated'.
+From our testing and with a regular Linux server we can scan 3x /16 prefixes in few hours compared to the multiple days from our precedent version of the script.
+
+Tested and working with Python 3.12.2 and Netbox 3.6.x - 3.7.x
+
+The How-To are located in https://github.com/henrionlo/netbox-nmap-scan/wiki
