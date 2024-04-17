@@ -17,3 +17,9 @@ The more prefixes you want to scan, the more time it will require to finish.
 Tested and working with Python 3.12.2 and Netbox 3.6.x - 3.7.x
 
 The How-To are located in https://github.com/henrionlo/netbox-nmap-scan/wiki
+
+TODO
+- Add DNS server selection for the nmap command in the ini file (if required to have a different one from the system DNS running the script)
+- Allow users to disable the DNS part of the script and only run the regular nmap command
+- Cleanup of code and import
+- Adding more description
