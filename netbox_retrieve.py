@@ -28,12 +28,13 @@ def write_to_csv(data, filename):
     file_path = os.path.join(script_dir, filename)  # Construct the full path to the output file
     with open(file_path, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Prefix', 'Status', 'Tags', 'Tenant'])  # Writing headers
+        writer.writerow(['Prefix', 'VRF', 'Status', 'Tags', 'Tenant'])  # Writing headers
         for prefix in data:
             tag_names = [tag.name for tag in prefix.tags]
             tenant_name = prefix.tenant.name if prefix.tenant else 'N/A'
             status_value = prefix.status.value if prefix.status else 'N/A'  # Extract the value of the status field
-            writer.writerow([prefix.prefix, status_value, ', '.join(tag_names), tenant_name])
+            vrf_name = prefix.vrf.name if prefix.vrf else 'N/A'  # Extract the name of the VRF
+            writer.writerow([prefix.prefix, vrf_name, status_value, ', '.join(tag_names), tenant_name])
 
 # Read URL and token from var.ini
 config = configparser.ConfigParser()

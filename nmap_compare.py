@@ -67,7 +67,7 @@ def write_csv(data, file_path):
     - file_path (str): The path to the output CSV file.
     """
     with open(file_path, 'w', newline='') as file:
-        fieldnames = ['address', 'dns_name', 'status', 'description', 'tags', 'tenant']
+        fieldnames = ['address', 'dns_name', 'status', 'description', 'tags', 'tenant', 'VRF']  # Added 'VRF' to fieldnames
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         
         # Write header

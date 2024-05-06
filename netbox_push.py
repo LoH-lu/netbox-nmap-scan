@@ -27,18 +27,22 @@ def process_row(row, pbar):
         existing_address.tags = tags_list
         if row['tenant'] != 'N/A':  # Check if tenant is not 'N/A'
             existing_address.tenant = {'name': row['tenant']}
+        if row['VRF'] != 'N/A':  # Check if VRF is not 'N/A'
+            existing_address.vrf = {'name': row['VRF']}
         existing_address.save()
     else:
         try:
             # Create a new address if it doesn't exist
             tenant_data = {'name': row['tenant']} if row['tenant'] != 'N/A' else None
+            vrf_data = {'name': row['VRF']} if row['VRF'] != 'N/A' else None
             netbox.ipam.ip_addresses.create(
                 address=row['address'],
                 status=row['status'],
                 description=row['description'],
                 dns_name=row['dns_name'],
                 tags=tags_list,
-                tenant=tenant_data
+                tenant=tenant_data,
+                vrf=vrf_data
             )
         except pynetbox.core.query.RequestError as e:
             # Handle duplicate address error

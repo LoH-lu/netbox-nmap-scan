@@ -33,17 +33,19 @@ def remove_scanned_prefixes(data, scanned_prefixes):
     
     # Rewrite the updated data to the CSV file
     with open('ipam_prefixes.csv', 'w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=['Prefix', 'Status', 'Tags', 'Tenant'])
+        fieldnames = ['Prefix', 'VRF', 'Status', 'Tags', 'Tenant']  # Added 'VRF' to fieldnames
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(updated_data)
 
-def run_nmap_on_prefix(prefix, tenant):
+def run_nmap_on_prefix(prefix, tenant, vrf):
     """
     Run nmap scan on a given prefix.
 
     Args:
     - prefix (str): The prefix to be scanned.
     - tenant (str): The tenant associated with the prefix.
+    - vrf (str): The VRF associated with the prefix.
 
     Returns:
     - results (list): A list of dictionaries containing scan results.
@@ -81,7 +83,8 @@ def run_nmap_on_prefix(prefix, tenant):
                 'status': 'active',
                 'description': 'Scanned IP address',
                 'tags': 'autoscan',
-                'tenant': tenant
+                'tenant': tenant,
+                'VRF': vrf  # Add VRF to the results
             })
     print(f"Finished scan on prefix: {prefix}")
     return results, True
@@ -102,7 +105,7 @@ def run_nmap_on_prefixes(data, output_folder):
 
     with ThreadPoolExecutor(max_workers=5) as executor:  # Adjust the max_workers parameter based on your system's capabilities
         # Use executor.map to asynchronously run the scans and get results
-        futures = {executor.submit(run_nmap_on_prefix, row['Prefix'], row['Tenant']): row for row in rows_to_scan}
+        futures = {executor.submit(run_nmap_on_prefix, row['Prefix'], row['Tenant'], row['VRF']): row for row in rows_to_scan}
 
         for future in concurrent.futures.as_completed(futures):
             prefix_results, success = future.result()
@@ -135,7 +138,8 @@ def write_results_to_csv(results, output_folder):
     is_empty = not os.path.exists(output_filename) or os.stat(output_filename).st_size == 0
 
     with open(output_filename, 'a', newline='') as file:  # Use 'a' (append) mode to add results to the file
-        writer = csv.DictWriter(file, fieldnames=['address', 'dns_name', 'status', 'description', 'tags', 'tenant'])
+        fieldnames = ['address', 'dns_name', 'status', 'description', 'tags', 'tenant', 'VRF']  # Added 'VRF' to fieldnames
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
 
         # Add headers if the file is empty
         if is_empty:
