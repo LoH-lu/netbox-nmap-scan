@@ -24,3 +24,4 @@ TODO
 - Cleanup of code and import
 - Adding more description
 - All-in-One script for easier setup
+- Add Last scan time
