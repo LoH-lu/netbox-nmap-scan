@@ -8,9 +8,13 @@ If you don't want a prefix to get scan, create a new tag 'Disable Automatic Scan
 
 ![image](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/b7a223ae-3a55-42cb-8f28-87d282e103c8)
 
-Create as well the tag 'autoscan', this will allow you to quickly know which IP Addresses has been added by the script.
+Create the tag 'autoscan', this will allow you to quickly know which IP Addresses has been added by the script.
 
 ![image](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/435cec58-1f92-42f2-b4eb-1448a4d22161)
+
+And create the following custom field in Customization, this way you can see when was the last time an ip address has been pinged by the scanning engine.
+
+![image](https://github.com/LoH-lu/netbox-nmap-scan/assets/139378145/c812ee55-71d0-4d8e-9b14-f337a5d867a5)
 
 The more prefixes you want to scan, the more time it will require to finish.
 
