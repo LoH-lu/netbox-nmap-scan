@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 import os
 
-def get_file_path(directory, date):
+def get_file_path(directory, date_time):
     """
     Generate a file path based on the directory and date.
 
@@ -13,7 +13,7 @@ def get_file_path(directory, date):
     Returns:
     - file_path (str): The full file path based on the directory and date.
     """
-    return os.path.join(directory, f'nmap_results_{date.strftime("%Y-%m-%d")}.csv')
+    return os.path.join(directory, f'nmap_results_{date_time.strftime("%Y-%m-%d_%H-%M-%S")}.csv')
 
 def get_latest_files(directory, num_files=2):
     """
@@ -35,7 +35,7 @@ directory = 'results/'
 
 # Get the two latest file paths
 latest_files = get_latest_files(directory)
-file_paths = [get_file_path(directory, datetime.strptime(file_name[13:23], "%Y-%m-%d")) for file_name in latest_files]
+file_paths = [get_file_path(directory, datetime.strptime(file_name[13:32], "%Y-%m-%d_%H-%M-%S")) for file_name in latest_files]
 
 # Output file path
 output_file_path = 'ipam_addresses.csv'
@@ -67,7 +67,7 @@ def write_csv(data, file_path):
     - file_path (str): The path to the output CSV file.
     """
     with open(file_path, 'w', newline='') as file:
-        fieldnames = ['address', 'dns_name', 'status', 'description', 'tags', 'tenant', 'VRF']  # Added 'VRF' to fieldnames
+        fieldnames = ['address', 'dns_name', 'status', 'scantime', 'tags', 'tenant', 'VRF']  # Added 'VRF' to fieldnames
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         
         # Write header

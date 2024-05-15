@@ -22,7 +22,7 @@ def process_row(row, pbar):
     if existing_address:
         # Update the existing address
         existing_address.status = row['status']
-        existing_address.description = row['description']
+        existing_address.custom_fields = {'scantime': row['scantime']}  # Changed 'description' to 'scantime'
         existing_address.dns_name = row['dns_name']
         existing_address.tags = tags_list
         if row['tenant'] != 'N/A':  # Check if tenant is not 'N/A'
@@ -38,7 +38,7 @@ def process_row(row, pbar):
             netbox.ipam.ip_addresses.create(
                 address=row['address'],
                 status=row['status'],
-                description=row['description'],
+                custom_fields={'scantime': row['scantime']},  # Changed 'description' to 'scantime'
                 dns_name=row['dns_name'],
                 tags=tags_list,
                 tenant=tenant_data,
