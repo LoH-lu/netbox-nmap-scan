@@ -18,7 +18,7 @@ And create the following custom field in Customization, this way you can see whe
 
 The more prefixes you want to scan, the more time it will require to finish.
 
-Tested and working with Python 3.12.2 and Netbox 3.6.x - 4.0.x
+Tested and working with Python 3.12.2 - 3.12.4 and Netbox 3.6.x - 4.0.x
 
 The How-To are located in https://github.com/henrionlo/netbox-nmap-scan/wiki
 
