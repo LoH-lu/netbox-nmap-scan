@@ -3,6 +3,9 @@ import os
 import configparser
 import netbox_connection
 
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 def get_ipam_prefixes(netbox):
     """
     Retrieve all IPAM prefixes from Netbox.
@@ -24,7 +27,6 @@ def write_to_csv(data, filename):
     - data (pynetbox.core.query.Request): IPAM prefixes data retrieved from Netbox.
     - filename (str): Name of the CSV file to write data to.
     """
-    script_dir = os.path.dirname(os.path.realpath(__file__))  # Get the directory of the running script
     file_path = os.path.join(script_dir, filename)  # Construct the full path to the output file
     with open(file_path, 'w', newline='') as file:
         writer = csv.writer(file)
@@ -38,7 +40,7 @@ def write_to_csv(data, filename):
 
 # Read URL and token from var.ini
 config = configparser.ConfigParser()
-config.read('var.ini')
+config.read(os.path.join(script_dir, 'var.ini'))
 url = config['credentials']['url']
 token = config['credentials']['token']
 
