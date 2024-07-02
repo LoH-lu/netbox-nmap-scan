@@ -2,6 +2,9 @@ import csv
 from datetime import datetime
 import os
 
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 def get_file_path(directory, date_time):
     """
     Generate a file path based on the directory and date.
@@ -13,7 +16,7 @@ def get_file_path(directory, date_time):
     Returns:
     - file_path (str): The full file path based on the directory and date.
     """
-    return os.path.join(directory, f'nmap_results_{date_time.strftime("%Y-%m-%d_%H-%M-%S")}.csv')
+    return os.path.join(script_dir, directory, f'nmap_results_{date_time.strftime("%Y-%m-%d_%H-%M-%S")}.csv')
 
 def get_latest_files(directory, num_files=2):
     """
@@ -26,19 +29,20 @@ def get_latest_files(directory, num_files=2):
     Returns:
     - files (list): The list of latest CSV file names.
     """
-    files = [f for f in os.listdir(directory) if f.endswith('.csv')]
-    files.sort(key=lambda x: os.path.getmtime(os.path.join(directory, x)), reverse=True)
+    full_directory = os.path.join(script_dir, directory)
+    files = [f for f in os.listdir(full_directory) if f.endswith('.csv')]
+    files.sort(key=lambda x: os.path.getmtime(os.path.join(full_directory, x)), reverse=True)
     return files[:num_files]
 
 # Directory for result files
-directory = 'results/'
+directory = 'results'
 
 # Get the two latest file paths
 latest_files = get_latest_files(directory)
 file_paths = [get_file_path(directory, datetime.strptime(file_name[13:32], "%Y-%m-%d_%H-%M-%S")) for file_name in latest_files]
 
 # Output file path
-output_file_path = 'ipam_addresses.csv'
+output_file_path = os.path.join(script_dir, 'ipam_addresses.csv')
 
 def read_csv(file_path):
     """
@@ -67,7 +71,7 @@ def write_csv(data, file_path):
     - file_path (str): The path to the output CSV file.
     """
     with open(file_path, 'w', newline='') as file:
-        fieldnames = ['address', 'dns_name', 'status', 'scantime', 'tags', 'tenant', 'VRF']  # Added 'VRF' to fieldnames
+        fieldnames = ['address', 'dns_name', 'status', 'scantime', 'tags', 'tenant', 'VRF']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         
         # Write header

@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 # Lock for writing to CSV file
 csv_lock = threading.Lock()
 
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 def read_from_csv(filename):
     """
@@ -25,7 +27,8 @@ def read_from_csv(filename):
     Returns:
     - data (list): A list of dictionaries representing rows from the CSV file.
     """
-    with open(filename, 'r') as file:
+    filepath = os.path.join(script_dir, filename)
+    with open(filepath, 'r') as file:
         reader = csv.DictReader(file)
         data = [row for row in reader]
     return data
@@ -42,8 +45,9 @@ def remove_scanned_prefixes(data, scanned_prefixes):
     updated_data = [row for row in data if row['Prefix'] not in scanned_prefixes]
     
     # Rewrite the updated data to the CSV file
-    with open('ipam_prefixes.csv', 'w', newline='') as file:
-        fieldnames = ['Prefix', 'VRF', 'Status', 'Tags', 'Tenant']  # Added 'VRF' to fieldnames
+    filepath = os.path.join(script_dir, 'ipam_prefixes.csv')
+    with open(filepath, 'w', newline='') as file:
+        fieldnames = ['Prefix', 'VRF', 'Status', 'Tags', 'Tenant']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(updated_data)
@@ -110,12 +114,15 @@ def run_nmap_on_prefixes(data, output_folder):
     results = []
     scanned_prefixes = []
 
+    # Create the full path for the output folder
+    output_folder_path = os.path.join(script_dir, output_folder)
+
     # Filter rows to scan only those with status 'active' and without the tag 'Disable Automatic Scanning'
     rows_to_scan = [row for row in data if row['Status'] == 'active' and 'Disable Automatic Scanning' not in row['Tags']]
 
     script_start_time = datetime.now()  # Get the script start time
 
-    with ThreadPoolExecutor(max_workers=5) as executor:  # Adjust the max_workers parameter based on your system's capabilities
+    with ThreadPoolExecutor(max_workers=5) as executor:
         # Use executor.map to asynchronously run the scans and get results
         futures = {executor.submit(run_nmap_on_prefix, row['Prefix'], row['Tenant'], row['VRF']): row for row in rows_to_scan}
 
@@ -125,8 +132,7 @@ def run_nmap_on_prefixes(data, output_folder):
                 with csv_lock:
                     results.extend(prefix_results)
                     scanned_prefixes.append(futures[future]['Prefix'])
-                    write_results_to_csv(prefix_results, output_folder, script_start_time)  # Pass script start time
-
+                    write_results_to_csv(prefix_results, output_folder_path, script_start_time)
 
     remove_scanned_prefixes(data, scanned_prefixes)
     return results
@@ -151,8 +157,8 @@ def write_results_to_csv(results, output_folder, script_start_time):
     # Check if the file is empty
     is_empty = not os.path.exists(output_filename) or os.stat(output_filename).st_size == 0
 
-    with open(output_filename, 'a', newline='') as file:  # Use 'a' (append) mode to add results to the file
-        fieldnames = ['address', 'dns_name', 'status', 'tags', 'tenant', 'VRF', 'scantime']  # Added 'VRF' to fieldnames
+    with open(output_filename, 'a', newline='') as file:
+        fieldnames = ['address', 'dns_name', 'status', 'tags', 'tenant', 'VRF', 'scantime']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
 
         # Add headers if the file is empty

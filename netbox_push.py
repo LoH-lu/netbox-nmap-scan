@@ -1,9 +1,13 @@
 import csv
-import pynetbox
-from netbox_connection import connect_to_netbox
+import os
 from concurrent.futures import ThreadPoolExecutor
 import configparser
+import pynetbox
 from tqdm import tqdm
+from netbox_connection import connect_to_netbox
+
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 def process_row(row, pbar):
     """
@@ -67,7 +71,8 @@ def write_data_to_netbox(url, token, csv_file):
     global netbox
     netbox = connect_to_netbox(url, token)
 
-    with open(csv_file, 'r') as file:
+    csv_file_path = os.path.join(script_dir, csv_file)
+    with open(csv_file_path, 'r') as file:
         reader = csv.DictReader(file)
         rows = list(reader)
 
@@ -81,7 +86,7 @@ def write_data_to_netbox(url, token, csv_file):
 
 # Read URL and token from var.ini
 config = configparser.ConfigParser()
-config.read('var.ini')
+config.read(os.path.join(script_dir, 'var.ini'))
 url = config['credentials']['url']
 token = config['credentials']['token']
 
