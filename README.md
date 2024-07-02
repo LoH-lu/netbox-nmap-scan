@@ -27,4 +27,5 @@ TODO
 - Allow users to disable the DNS part of the script and only run the regular nmap command
 - Cleanup of code and import
 - Adding more description
+- Better logging of errors and debug output
 - All-in-One script for easier setup
