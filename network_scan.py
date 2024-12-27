@@ -166,6 +166,8 @@ def run_nmap_on_prefix(
 
         if enable_dns:
             command.append("-R")
+        else:
+            command.append("-n")
 
         command.append(prefix)
 
