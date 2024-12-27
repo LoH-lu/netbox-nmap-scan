@@ -246,7 +246,8 @@ def write_data_to_netbox(url: str, token: str, csv_file: str) -> None:
             reader = csv.DictReader(file)
             rows = list(reader)
             total_rows = len(rows)
-            
+            logger.info(f"Found {total_rows} rows to process")
+
             if show_progress:
                 pbar = tqdm(total=total_rows, desc="Processing Rows")
             else:
