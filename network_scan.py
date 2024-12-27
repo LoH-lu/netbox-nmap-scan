@@ -54,7 +54,7 @@ class ScanResult:
     status: str
     tags: str
     tenant: str
-    vrf: str
+    VRF: str
     scantime: str
 
 def setup_logging() -> logging.Logger:
@@ -132,7 +132,7 @@ def read_from_csv(filename: str) -> List[Dict[str, str]]:
 def run_nmap_on_prefix(
     prefix: str,
     tenant: str,
-    vrf: str,
+    VRF: str,
     result_queue: queue.Queue
 ) -> Tuple[List[ScanResult], bool]:
     """
@@ -141,7 +141,7 @@ def run_nmap_on_prefix(
     Args:
         prefix: Network prefix to scan
         tenant: Tenant associated with the prefix
-        vrf: VRF associated with the prefix
+        VRF: VRF associated with the prefix
         result_queue: Queue for storing scan results
 
     Returns:
@@ -177,7 +177,7 @@ def run_nmap_on_prefix(
         results = []
         for line in output.split('\n'):
             if "Nmap scan report for" in line:
-                result = _parse_nmap_output(line, prefix, tenant, vrf)
+                result = _parse_nmap_output(line, prefix, tenant, VRF)
                 if result:
                     results.append(result)
                     result_queue.put(result)
@@ -197,7 +197,7 @@ def _parse_nmap_output(
     line: str,
     prefix: str,
     tenant: str,
-    vrf: str
+    VRF: str
 ) -> Optional[ScanResult]:
     """Parse a single line of nmap output."""
     logger = logging.getLogger(__name__)
@@ -220,7 +220,7 @@ def _parse_nmap_output(
             status='active',
             tags='autoscan',
             tenant=tenant,
-            vrf=vrf,
+            VRF=VRF,
             scantime=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         )
 
@@ -314,6 +314,7 @@ def process_network_prefixes() -> None:
 
 def main() -> None:
     """Main entry point of the script."""
+    logger = setup_logging()
     process_network_prefixes()
 
 if __name__ == "__main__":
