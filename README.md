@@ -51,7 +51,7 @@ For detailed usage instructions and examples, please refer to our [Wiki](https:/
 ## Roadmap
 
 - [ ] DNS server configuration in INI file for custom DNS resolution
-- [ ] Option to disable DNS resolution functionality
+- [X] Option to disable DNS resolution functionality
 - [ ] Toggle for last scan time tracking
 - [ ] Toggle for the progress bar display while importing
 - [ ] All-in-One setup script for easier deployment
