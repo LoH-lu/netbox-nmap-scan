@@ -67,7 +67,7 @@ def run_nmap_on_prefix(prefix, tenant, vrf):
     """
     logger.info(f"Starting scan on prefix: {prefix}")
     # Run nmap on the prefix with DNS resolution and specified DNS servers
-    command = f"nmap -sn -R -T3 --min-parallelism 10 {prefix}"
+    command = f"nmap -sn -T4 --min-parallelism 10 --max-retries 2 -R {prefix}"
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = process.communicate()
 
