@@ -24,6 +24,7 @@ import os
 import sys
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import configparser
 import logging
 import threading
 from typing import Dict, List, Tuple, Optional
@@ -150,16 +151,23 @@ def run_nmap_on_prefix(
     logger = logging.getLogger(__name__)
     logger.info(f"Starting scan on prefix: {prefix}")
 
+    config = configparser.ConfigParser()
+    config.read('var.ini')
+    enable_dns = config.getboolean('scan_options', 'enable_dns', fallback=True)
+
     try:
         command = [
             "nmap",
             "-sn",  # Ping scan
             "-T4",  # Aggressive timing
             "--min-parallelism", "10",
-            "--max-retries", "2",
-            "-R",  # DNS resolution
-            prefix
+            "--max-retries", "2"
         ]
+
+        if enable_dns:
+            command.append("-R")
+
+        command.append(prefix)
 
         process = subprocess.Popen(
             command,
@@ -201,6 +209,13 @@ def _parse_nmap_output(
 ) -> Optional[ScanResult]:
     """Parse a single line of nmap output."""
     logger = logging.getLogger(__name__)
+
+    config = configparser.ConfigParser()
+    config.read('var.ini')
+    enable_scantime = config.getboolean('scan_options', 'enable_scantime', fallback=True)
+
+    scantime = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if enable_scantime else None
+
     try:
         parts = line.split()
         dns_name = None
@@ -221,7 +236,7 @@ def _parse_nmap_output(
             tags='autoscan',
             tenant=tenant,
             VRF=VRF,
-            scantime=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            scantime=scantime
         )
 
     except Exception:
