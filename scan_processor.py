@@ -252,6 +252,7 @@ def process_scan_results() -> None:
 
 def main() -> None:
     """Main entry point of the script."""
+    logger = setup_logging()
     process_scan_results()
 
 if __name__ == "__main__":
