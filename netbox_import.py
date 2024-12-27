@@ -134,7 +134,8 @@ def process_row(row: Dict[str, str], pbar: tqdm, netbox_instance: pynetbox.api) 
         logger.error(f"Failed to process row for address {address}", exc_info=True)
         raise
     finally:
-        pbar.update(1)
+        if pbar:
+            pbar.update(1)
 
 def _update_existing_address(
     existing_address: object,
@@ -229,6 +230,10 @@ def write_data_to_netbox(url: str, token: str, csv_file: str) -> None:
     """
     logger = logging.getLogger(__name__)
 
+    config = configparser.ConfigParser()
+    config.read('var.ini')
+    show_progress = config.getboolean('scan_options', 'show_progress', fallback=True)
+
     try:
         logger.info("Initializing Netbox connection...")
         netbox_instance = connect_to_netbox(url, token)
@@ -241,22 +246,28 @@ def write_data_to_netbox(url: str, token: str, csv_file: str) -> None:
             reader = csv.DictReader(file)
             rows = list(reader)
             total_rows = len(rows)
-            logger.info(f"Found {total_rows} rows to process")
+            
+            if show_progress:
+                pbar = tqdm(total=total_rows, desc="Processing Rows")
+            else:
+                pbar = None
 
-            with tqdm(total=total_rows, desc="Processing Rows") as pbar:
-                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                    futures = [
-                        executor.submit(
-                            process_row, row, pbar, netbox_instance
-                        ) for row in rows
-                    ]
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures = [
+                    executor.submit(
+                        process_row, row, pbar if show_progress else None, netbox_instance
+                    ) for row in rows
+                ]
 
-                    for future in as_completed(futures):
-                        try:
-                            future.result()
-                        except Exception:
-                            logger.error("Error in thread pool execution",exc_info=True)
-                            continue
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception:
+                        logger.error("Error in thread pool execution", exc_info=True)
+                        continue
+
+            if pbar:
+                pbar.close()
 
         logger.info("Completed processing all rows")
 
