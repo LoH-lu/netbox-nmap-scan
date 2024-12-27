@@ -54,6 +54,7 @@ For detailed usage instructions and examples, please refer to our [Wiki](https:/
 - [X] Option to disable DNS resolution functionality
 - [X] Toggle for last scan time tracking
 - [X] Toggle for the progress bar display while importing
+- [ ] Toggle for the logger in the Python console
 - [ ] All-in-One setup script for easier deployment
 
 ## Contributing
