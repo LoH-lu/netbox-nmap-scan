@@ -7,7 +7,7 @@ Automatically maintain an up-to-date inventory of active IP addresses in your ne
 - Automatic scanning of all active prefixes in Netbox
 - Custom tag support for excluding prefixes from scanning
 - Tracking of last scan time for each IP address
-- DNS resolution support
+- DNS resolution support (optional)
 - Tested with Python 3.12.6 - 3.13.1 and Netbox 4.1.10
 
 ## Prerequisites
@@ -29,7 +29,7 @@ Automatically maintain an up-to-date inventory of active IP addresses in your ne
    
    ![Autoscan Tag Configuration](https://github.com/henrionlo/netbox-nmap-scan/assets/139378145/435cec58-1f92-42f2-b4eb-1448a4d22161)
 
-   ### Custom Fields
+   ### Custom Fields (optional)
    Add a custom field to track the last scan time for each IP address:
    
    ![Last Scan Time Custom Field](https://github.com/LoH-lu/netbox-nmap-scan/assets/139378145/c812ee55-71d0-4d8e-9b14-f337a5d867a5)
