@@ -9,7 +9,7 @@ capabilities for efficient scanning operations.
 The script:
 1. Reads network prefixes from a CSV file
 2. Performs concurrent nmap scans on active prefixes
-3. Writes results to timestamped CSV files
+3. Writes results to CSV file immediately after each scan
 4. Removes each scanned network from input file immediately after scanning
 """
 
@@ -22,9 +22,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import configparser
 import logging
 import threading
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
-import queue
 import tempfile
 import shutil
 
@@ -105,7 +104,7 @@ def remove_prefix_from_csv(filename: str, prefix_to_remove: str) -> None:
     """
     logger = logging.getLogger(__name__)
     filepath = os.path.join(SCRIPT_DIR, filename)
-    
+
     with FILE_LOCK:  # Ensure thread safety when modifying the file
         try:
             # Create a temporary file
@@ -116,35 +115,72 @@ def remove_prefix_from_csv(filename: str, prefix_to_remove: str) -> None:
                 encoding='utf-8',
                 dir=os.path.dirname(filepath)
             )
-            
+
             removed = False
             # Read and write in a single pass
             with open(filepath, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
                 writer = csv.DictWriter(temp_file, fieldnames=reader.fieldnames)
                 writer.writeheader()
-                
+
                 for row in reader:
                     if row['Prefix'] != prefix_to_remove:
                         writer.writerow(row)
                     else:
                         removed = True
-            
+
             temp_file.close()
-            
+
             # Atomic replacement of the original file
             shutil.move(temp_file.name, filepath)
-            
+
             if removed:
                 logger.info(f"Successfully removed prefix {prefix_to_remove} from {filename}")
             else:
                 logger.warning(f"Prefix {prefix_to_remove} not found in {filename}")
-                
+
         except Exception as exc:
             logger.error(f"Error removing prefix {prefix_to_remove} from CSV: {str(exc)}", exc_info=True)
             if 'temp_file' in locals() and os.path.exists(temp_file.name):
                 os.unlink(temp_file.name)
             raise
+
+def write_scan_results(
+    results: List[ScanResult],
+    output_folder: str,
+    start_time: datetime
+) -> None:
+    """
+    Write scan results to CSV file immediately.
+    Uses file locking to ensure thread safety.
+    
+    Args:
+        results: List of scan results to write
+        output_folder: Folder to write results to
+        start_time: Script start time for file naming
+    """
+    logger = logging.getLogger(__name__)
+    start_time_str = start_time.strftime('%Y-%m-%d_%H-%M-%S')
+    output_file = os.path.join(output_folder, f'nmap_results_{start_time_str}.csv')
+
+    try:
+        with FILE_LOCK:
+            is_new_file = not os.path.exists(output_file)
+
+            with open(output_file, 'a', newline='', encoding='utf-8') as file:
+                writer = csv.DictWriter(file, fieldnames=OUTPUT_FIELDNAMES)
+
+                if is_new_file:
+                    writer.writeheader()
+
+                for result in results:
+                    writer.writerow(vars(result))
+
+            logger.debug(f"Wrote {len(results)} results to {output_file}")
+
+    except Exception as exc:
+        logger.error(f"Error writing results to CSV: {str(exc)}", exc_info=True)
+        raise
 
 def read_from_csv(filename: str) -> List[Dict[str, str]]:
     """
@@ -184,17 +220,17 @@ def run_nmap_on_prefix(
     prefix: str,
     tenant: str,
     VRF: str,
-    result_queue: queue.Queue,
+    script_start_time: datetime,
     input_filename: str
 ) -> Tuple[List[ScanResult], bool]:
     """
-    Run nmap scan on a given prefix and remove it from input file if successful.
+    Run nmap scan on a given prefix, write results and remove from input file if successful.
 
     Args:
         prefix: Network prefix to scan
         tenant: Tenant associated with the prefix
         VRF: VRF associated with the prefix
-        result_queue: Queue for storing scan results
+        script_start_time: Start time of the script for result file naming
         input_filename: Name of the input CSV file to update
 
     Returns:
@@ -242,10 +278,13 @@ def run_nmap_on_prefix(
                 result = _parse_nmap_output(line, prefix, tenant, VRF)
                 if result:
                     results.append(result)
-                    result_queue.put(result)
 
-        # If scan was successful, remove the prefix immediately
+        # If scan was successful:
+        # 1. Write results immediately
+        # 2. Remove prefix from input file
         if process.returncode == 0:
+            if results:
+                write_scan_results(results, RESULTS_DIR, script_start_time)
             remove_prefix_from_csv(input_filename, prefix)
             logger.info(f"Completed scan on prefix: {prefix} - Found {len(results)} hosts")
             return results, True
@@ -349,8 +388,7 @@ def process_network_prefixes() -> None:
 
         logger.info(f"Found {len(rows_to_scan)} prefixes to scan")
 
-        # Set up result queue and start time
-        result_queue = queue.Queue()
+        # Record script start time for consistent file naming
         script_start_time = datetime.now()
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -360,7 +398,7 @@ def process_network_prefixes() -> None:
                     row['Prefix'],
                     row['Tenant'],
                     row['VRF'],
-                    result_queue,
+                    script_start_time,
                     input_filename
                 ): row for row in rows_to_scan
             }
@@ -373,17 +411,6 @@ def process_network_prefixes() -> None:
                         logger.info(f"Successfully processed: {futures[future]['Prefix']}")
                 except Exception:
                     logger.error("Error processing scan result", exc_info=True)
-
-        # Write final results from the result queue
-        results_to_write = []
-        while not result_queue.empty():
-            results_to_write.append(result_queue.get())
-            if len(results_to_write) >= 100:
-                write_results_to_csv(results_to_write, RESULTS_DIR, script_start_time)
-                results_to_write = []
-
-        if results_to_write:
-            write_results_to_csv(results_to_write, RESULTS_DIR, script_start_time)
 
         logger.info("Network scanning process completed")
 
