@@ -1,0 +1,4 @@
+pynetbox==7.4.1
+requests==2.32.3
+urllib3==2.3.0
+tqdm==4.67.1
