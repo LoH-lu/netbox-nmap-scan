@@ -145,7 +145,7 @@ def _update_existing_address(
     vrf_data: Optional[Dict[str, str]]
 ) -> None:
     """
-    Update an existing IP address in Netbox.
+    Update an existing IP address in Netbox while preserving existing tags.
     
     Args:
         existing_address: Existing Netbox IP address object
@@ -158,18 +158,39 @@ def _update_existing_address(
     logger.info(f"Updating existing address: {row['address']}")
 
     try:
+        # Get existing tags
+        existing_tags = existing_address.tags
+
+        # Convert existing tags to the same format as new tags if necessary
+        if existing_tags and not isinstance(existing_tags[0], dict):
+            existing_tags = [{'name': tag.name} for tag in existing_tags]
+
+        # Merge existing and new tags, avoiding duplicates
+        merged_tags = []
+        existing_tag_names = {tag['name'] for tag in existing_tags} if existing_tags else set()
+
+        # Add all existing tags
+        merged_tags.extend(existing_tags or [])
+
+        # Add new tags that don't already exist
+        for tag in tags_list:
+            if tag['name'] not in existing_tag_names:
+                merged_tags.append(tag)
+
+        # Update the address with merged tags and other fields
         existing_address.status = row['status']
         existing_address.custom_fields = {'scantime': row['scantime']}
         existing_address.dns_name = row['dns_name']
-        existing_address.tags = tags_list
+        existing_address.tags = merged_tags
         existing_address.tenant = tenant_data
         existing_address.vrf = vrf_data
 
         existing_address.save()
         logger.debug(f"Successfully updated address {row['address']} with status: {row['status']}")
+        logger.debug(f"Merged tags for {row['address']}: {merged_tags}")
 
     except Exception as exc:
-        logger.error(f"Error updating address {row['address']}: {str(exc)}",exc_info=True)
+        logger.error(f"Error updating address {row['address']}: {str(exc)}", exc_info=True)
         raise
 
 def _create_new_address(
