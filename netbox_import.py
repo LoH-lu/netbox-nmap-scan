@@ -192,6 +192,10 @@ def _update_existing_address(
             existing_address.vrf = vrf_data
             logger.debug(f"Updated all fields for non-DHCP address: {row['address']}")
 
+        existing_address.save()
+        logger.debug(f"Successfully updated address {row['address']}")
+        logger.debug(f"Merged tags for {row['address']}: {merged_tags}")
+
     except Exception as exc:
         logger.error(f"Error updating address {row['address']}: {str(exc)}", exc_info=True)
         raise
