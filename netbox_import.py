@@ -177,17 +177,20 @@ def _update_existing_address(
             if tag['name'] not in existing_tag_names:
                 merged_tags.append(tag)
 
-        # Update the address with merged tags and other fields
-        existing_address.status = row['status']
-        existing_address.custom_fields = {'scantime': row['scantime']}
-        existing_address.dns_name = row['dns_name']
-        existing_address.tags = merged_tags
-        existing_address.tenant = tenant_data
-        existing_address.vrf = vrf_data
-
-        existing_address.save()
-        logger.debug(f"Successfully updated address {row['address']} with status: {row['status']}")
-        logger.debug(f"Merged tags for {row['address']}: {merged_tags}")
+        if existing_address.status and existing_address.status.value.lower() == 'dhcp':
+            # For DHCP addresses, only update scantime and tags
+            existing_address.custom_fields = {'scantime': row['scantime']}
+            existing_address.tags = merged_tags
+            logger.debug(f"Updated scantime and tags for DHCP address: {row['address']}")
+        else:
+            # For non-DHCP addresses, update all fields
+            existing_address.status = row['status']
+            existing_address.custom_fields = {'scantime': row['scantime']}
+            existing_address.dns_name = row['dns_name']
+            existing_address.tags = merged_tags
+            existing_address.tenant = tenant_data
+            existing_address.vrf = vrf_data
+            logger.debug(f"Updated all fields for non-DHCP address: {row['address']}")
 
     except Exception as exc:
         logger.error(f"Error updating address {row['address']}: {str(exc)}", exc_info=True)
