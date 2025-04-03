@@ -186,7 +186,8 @@ def _update_existing_address(
             # For non-DHCP addresses, update all fields
             existing_address.status = row['status']
             existing_address.custom_fields = {'scantime': row['scantime']}
-            existing_address.dns_name = row['dns_name']
+            if row['dns_name']:
+                existing_address.dns_name = row['dns_name']
             existing_address.tags = merged_tags
             existing_address.tenant = tenant_data
             existing_address.vrf = vrf_data
