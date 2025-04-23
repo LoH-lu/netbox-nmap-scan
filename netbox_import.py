@@ -119,7 +119,7 @@ def process_row(row: Dict[str, str], pbar: tqdm, netbox_instance: pynetbox.api) 
         vrf_data = {'name': row['VRF']} if row['VRF'] != 'N/A' else None
 
         # Get existing address
-        existing_address = netbox_instance.ipam.ip_addresses.get(address=address)
+        existing_address = netbox_instance.ipam.ip_addresses.get(address=address, vrf=vrf_data['name'], tenant=tenant_data['name'])
 
         if existing_address:
             _update_existing_address(
