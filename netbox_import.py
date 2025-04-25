@@ -95,14 +95,6 @@ def parse_tags(tags_string: str) -> List[Dict[str, str]]:
 def process_row(row: Dict[str, str], pbar: tqdm, netbox_instance: pynetbox.api) -> None:
     """
     Process a single row from the CSV file and update/create IP addresses in Netbox.
-    
-    Args:
-        row (Dict[str, str]): Dictionary representing a single row from the CSV file
-        pbar (tqdm): Progress bar instance
-        netbox_instance (pynetbox.api): Netbox API instance
-        
-    Raises:
-        Exception: If there's an error processing the row
     """
     logger = logging.getLogger(__name__)
     address = row.get('address', 'unknown')
@@ -114,12 +106,28 @@ def process_row(row: Dict[str, str], pbar: tqdm, netbox_instance: pynetbox.api) 
         tags_list = parse_tags(row['tags'])
         logger.debug(f"Parsed tags for {address}: {tags_list}")
 
-        # Prepare tenant and VRF data
+        # Prepare tenant data
         tenant_data = {'name': row['tenant']} if row['tenant'] != 'N/A' else None
-        vrf_data = {'name': row['VRF']} if row['VRF'] != 'N/A' else None
+        
+        # Look up VRF by name
+        vrf_data = None
+        if row['VRF'] != 'N/A':
+            try:
+                vrf = netbox_instance.ipam.vrfs.get(name=row['VRF'])
+                if vrf:
+                    # Convert VRF object to a dictionary with just the ID
+                    vrf_data = {'id': vrf.id}
+                    logger.debug(f"Found VRF {row['VRF']} with ID {vrf.id}")
+                else:
+                    logger.warning(f"VRF {row['VRF']} not found in Netbox")
+            except Exception as e:
+                logger.error(f"Error looking up VRF {row['VRF']}: {str(e)}")
 
-        # Get existing address
-        existing_address = netbox_instance.ipam.ip_addresses.get(address=address, vrf=vrf_data['name'], tenant=tenant_data['name'])
+        # Get existing address - use the VRF ID
+        existing_address = netbox_instance.ipam.ip_addresses.get(
+            address=address, 
+            vrf_id=vrf_data['id'] if vrf_data else None
+        )
 
         if existing_address:
             _update_existing_address(
