@@ -135,13 +135,13 @@ def get_latest_files(dir_path: str, num_files: int = 2) -> List[str]:
 
 def read_csv(file_path: str) -> Dict[str, Dict[str, str]]:
     """
-    Read a CSV file and return a dictionary with addresses as keys.
+    Read a CSV file and return a dictionary with address_vrf combinations as keys.
 
     Args:
         file_path: The path to the CSV file
 
     Returns:
-        Dictionary with addresses as keys and corresponding row data as values
+        Dictionary with address_vrf combinations as keys and corresponding row data as values
         
     Raises:
         FileNotFoundError: If the file doesn't exist
@@ -155,9 +155,12 @@ def read_csv(file_path: str) -> Dict[str, Dict[str, str]]:
         with open(file_path, 'r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
+                # Create composite key using address and VRF
                 address = row['address']
-                data[address] = row
-                logger.debug(f"Processed row for address: {address}")
+                vrf = row['VRF']
+                composite_key = f"{address}_{vrf}"
+                data[composite_key] = row
+                logger.debug(f"Processed row for address: {address} in VRF: {vrf}")
 
         logger.info(f"Successfully read {len(data)} records from {file_path}")
         return data
