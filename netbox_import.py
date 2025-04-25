@@ -95,6 +95,14 @@ def parse_tags(tags_string: str) -> List[Dict[str, str]]:
 def process_row(row: Dict[str, str], pbar: tqdm, netbox_instance: pynetbox.api) -> None:
     """
     Process a single row from the CSV file and update/create IP addresses in Netbox.
+        
+    Args:
+        row (Dict[str, str]): Dictionary representing a single row from the CSV file
+        pbar (tqdm): Progress bar instance
+        netbox_instance (pynetbox.api): Netbox API instance
+        
+    Raises:
+        Exception: If there's an error processing the row
     """
     logger = logging.getLogger(__name__)
     address = row.get('address', 'unknown')
