@@ -173,6 +173,8 @@ cython_debug/
 # Project Specific 
 var.ini
 
+#Github file
+*.md
 
 # PyPI configuration file
 .pypirc
