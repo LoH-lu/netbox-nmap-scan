@@ -175,6 +175,7 @@ var.ini
 
 #Github file
 *.md
+LICENSE
 
 # PyPI configuration file
 .pypirc
