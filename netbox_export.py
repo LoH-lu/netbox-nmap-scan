@@ -193,9 +193,13 @@ def main() -> None:
         url, token = load_config()
 
         # Connect to Netbox
-        logger.info("Connecting to Netbox...")
-        netbox_instance = netbox_connection.connect_to_netbox(url, token)
-        logger.info("Successfully connected to Netbox")
+        try:
+            logger.info("Connecting to Netbox...")
+            netbox_instance = netbox_connection.connect_to_netbox(url, token)
+            logger.info("Successfully connected to Netbox")
+        except Exception as e:
+            logger.error("Failed to connect to Netbox", exc_info=True)
+            raise
 
         # Retrieve and export data
         ipam_prefixes = get_ipam_prefixes(netbox_instance)
