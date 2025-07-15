@@ -4,7 +4,7 @@ ARG PLATFORM="linux/amd64"
 ### 1/3 Base stage ###
 FROM --platform="${PLATFORM}" debian:stable-slim  AS base
 # Args in base stage are available in all stages that use it
-ARG NETBOX_NMAP_SCAN_TAG="0.3.4"
+ARG NETBOX_NMAP_SCAN_TAG="0.3.7"
 ARG PYTHON_VERSION="3.12"
 #
 WORKDIR /app
