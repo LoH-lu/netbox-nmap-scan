@@ -18,7 +18,7 @@ from typing import List, Optional
 import configparser
 from datetime import datetime
 import pynetbox
-import netbox_connection
+from scripts import netbox_connection
 
 # Script configuration
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

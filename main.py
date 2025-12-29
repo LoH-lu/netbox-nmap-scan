@@ -104,10 +104,10 @@ def main():
 
     # List of scripts to execute in order
     scripts: List[str] = [
-        "netbox_export.py",
-        "network_scan.py",
-        "scan_processor.py",
-        "netbox_import.py"
+        os.path.join("scripts", "netbox_export.py"),
+        os.path.join("scripts", "network_scan.py"),
+        os.path.join("scripts", "scan_processor.py"),
+        os.path.join("scripts", "netbox_import.py"),
     ]
 
     # Iterate over the list of scripts and run each one

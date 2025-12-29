@@ -22,7 +22,7 @@ from typing import Dict, List, Optional
 import urllib3
 import pynetbox
 from tqdm import tqdm
-from netbox_connection import connect_to_netbox
+from scripts.netbox_connection import connect_to_netbox
 
 # Disable insecure HTTPS warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
