@@ -28,9 +28,10 @@ import tempfile
 import shutil
 
 # Script configuration
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.join(SCRIPT_DIR, 'logs')
-RESULTS_DIR = os.path.join(SCRIPT_DIR, 'results')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = PROJECT_ROOT
+LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
+RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
 MAX_WORKERS = 5
 NMAP_TIMEOUT = 300  # seconds
 FILE_LOCK = threading.Lock()

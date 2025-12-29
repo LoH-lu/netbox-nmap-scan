@@ -28,8 +28,9 @@ from scripts.netbox_connection import connect_to_netbox
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Script configuration
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.join(SCRIPT_DIR, 'logs')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = PROJECT_ROOT
+LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 MAX_WORKERS = 5
 
 # Ensure log directory exists

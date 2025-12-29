@@ -21,8 +21,9 @@ import pynetbox
 from scripts import netbox_connection
 
 # Script configuration
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.join(SCRIPT_DIR, 'logs')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = PROJECT_ROOT
+LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 CSV_HEADERS = ['Prefix', 'VRF', 'Status', 'Tags', 'Tenant']
 
 # Ensure log directory exists
