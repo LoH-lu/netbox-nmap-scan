@@ -6,4 +6,4 @@ packaging==25.0
 pynetbox==7.4.1
 requests==2.32.4
 tqdm==4.67.1
-urllib3==2.6.0
+urllib3==2.6.3
