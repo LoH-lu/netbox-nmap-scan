@@ -8,12 +8,12 @@ Automatically maintain an up-to-date inventory of active IP addresses in your ne
 - Custom tag support for excluding prefixes from scanning
 - Tracking of last scan time for each IP address
 - DNS resolution support (optional)
-- Tested with Python 3.12.6 - 3.13.3 and Netbox 4.3.7
+- Tested with Python 3.10.12 - 3.13.11 and Netbox 4.2.9 - 4.3.7
 
 ## Prerequisites
 
-- Python 3.12.6 or later
-- Netbox 4.1.10 or later
+- Python 3.10.12 or later
+- Netbox 4.2.9 or later
 - nmap installed on your system
 - Required Python packages (listed in requirements.txt)
 
