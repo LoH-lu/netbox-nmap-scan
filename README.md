@@ -8,7 +8,7 @@ Automatically maintain an up-to-date inventory of active IP addresses in your ne
 - Custom tag support for excluding prefixes from scanning
 - Tracking of last scan time for each IP address
 - DNS resolution support (optional)
-- Tested with Python 3.12.6 - 3.13.3 and Netbox 4.2.3
+- Tested with Python 3.12.6 - 3.13.3 and Netbox 4.3.7
 
 ## Prerequisites
 
