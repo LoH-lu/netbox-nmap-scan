@@ -11,8 +11,8 @@ Automatically maintain an up-to-date inventory of active IP addresses in your ne
 
 ## Prerequisites
 
-- Python 3.12.x or later (should work on sooner version but with limited support from this repo in case of issue)
-- Netbox 4.4.x or later (should work on sooner version but with limited support from this repo in case of issue)
+- Python 3.12.x or later (should work on older version but with limited support from this repo in case of issue)
+- Netbox 4.4.x or later (should work on older version but with limited support from this repo in case of issue)
 - nmap installed on your system
 - Required Python packages (listed in requirements.txt)
 
