@@ -1,38 +1,53 @@
+#!/usr/bin/env python3
+"""
+Netbox API connection helper.
+
+Library module:
+- does not configure logging handlers
+- uses logger = logging.getLogger(__name__)
+"""
+
+from __future__ import annotations
+
+import logging
+
 import pynetbox
 import requests
 
-def connect_to_netbox(url, token):
+logger = logging.getLogger(__name__)
+
+
+def connect_to_netbox(url: str, token: str) -> pynetbox.api:
     """
-    Connect to the Netbox API using the provided URL and token.
+    Connect to a Netbox API and validate /api/status/ is reachable.
 
-    Args:
-    - url (str): The base URL of the Netbox instance.
-    - token (str): The authentication token for accessing the Netbox API.
-
-    Returns:
-    - netbox (pynetbox.core.api.Api): The Netbox API object configured to use the provided URL and token.
-
-    Raises:
-    - Exception: If the connection to Netbox fails.
+    Security note:
+        session.verify=False matches current behavior; prefer enabling SSL verification
+        if you can deploy the proper CA chain.
     """
-    # Create a custom requests session with SSL verification disabled
+    base_url = url.rstrip("/")
+
     session = requests.Session()
-    session.verify = False  # Disabling SSL verification for the session
+    session.verify = False
 
-    # Test the connection by making a direct request to /api/status/
+    headers = {"Authorization": f"Token {token}"}
+    status_url = f"{base_url}/api/status/"
+
     try:
-        headers = {"Authorization": f"Token {token}"}
-        response = session.get(f"{url}/api/status/", headers=headers)
-        response.raise_for_status()  # Raise an error for HTTP status codes 4xx/5xx
+        resp = session.get(status_url, headers=headers, timeout=15)
+        resp.raise_for_status()
 
-        # Check if the response contains the "netbox-version" key
-        status_data = response.json()
-        if "netbox-version" in status_data:
-            # Create and return the Netbox API object
-            netbox = pynetbox.api(url, token)
-            netbox.http_session = session
-            return netbox
-        else:
-            raise Exception("Unexpected response from Netbox /api/status/ endpoint.")
-    except Exception as e:
-        raise Exception(f"Failed to connect to Netbox: {e}")
+        status_data = resp.json()
+        if "netbox-version" not in status_data:
+            raise RuntimeError("Unexpected response payload from /api/status/")
+
+        nb = pynetbox.api(base_url, token)
+        nb.http_session = session
+        return nb
+
+    except requests.RequestException as exc:
+        logger.error("Failed to reach Netbox status endpoint %s", status_url, exc_info=True)
+        raise RuntimeError(f"Failed to connect to Netbox ({status_url}): {exc}") from exc
+    except ValueError as exc:
+        logger.error("Netbox status endpoint returned non-JSON response %s", status_url, exc_info=True)
+        raise RuntimeError(f"Netbox status endpoint returned invalid JSON: {exc}") from exc
