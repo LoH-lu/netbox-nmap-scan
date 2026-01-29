@@ -13,7 +13,6 @@ The design favors correctness, traceability, and safe automation over visual out
 
 =====================================================================
 ## OVERVIEW
-=====================================================================
 
 netbox-nmap-scan performs ICMP discovery scans (nmap -sn) against all
 Netbox prefixes that meet the following criteria:
@@ -27,7 +26,6 @@ allowing safe concurrency, restartability, and forensic inspection.
 
 =====================================================================
 ## KEY FEATURES
-=====================================================================
 
 - Automatic discovery of active IP addresses using nmap
 - Continuous synchronization with Netbox IPAM
@@ -44,7 +42,6 @@ allowing safe concurrency, restartability, and forensic inspection.
 
 =====================================================================
 ## IMPORTANT BEHAVIORAL GUARANTEES
-=====================================================================
 
 1) ipam_addresses.csv IS ALWAYS LATEST
 ------------------------------------
@@ -80,7 +77,6 @@ This ensures:
 
 =====================================================================
 ## DIRECTORY STRUCTURE
-=====================================================================
 
 project_root/
 ├── main.py
@@ -108,7 +104,6 @@ project_root/
 
 =====================================================================
 ## PREFIX FOLDER CONTENT
-=====================================================================
 
 prefix.info
 - Contains the CIDR of the prefix
@@ -129,7 +124,6 @@ ipam_addresses.csv
 
 =====================================================================
 ## NETBOX CONFIGURATION
-=====================================================================
 
 TAGS
 ----
@@ -151,7 +145,6 @@ scantime (DateTime)
 
 =====================================================================
 ## CONFIGURATION (var.ini)
-=====================================================================
 
 Example configuration:
 
@@ -209,7 +202,6 @@ LOGGING OPTIONS
 
 =====================================================================
 ## USAGE
-=====================================================================
 
 Run the scheduler:
 
@@ -222,7 +214,6 @@ Recommended:
 
 =====================================================================
 ## PERFORMANCE NOTES
-=====================================================================
 
 - Scan duration scales with number and size of prefixes
 - Netbox API pressure scales with number of IP changes
@@ -234,7 +225,6 @@ Recommended:
 
 =====================================================================
 ## WHAT THIS TOOL DOES NOT DO
-=====================================================================
 
 - It does NOT enumerate unused IPs
 - It does NOT assign IPs arbitrarily
@@ -246,7 +236,6 @@ The tool reflects observed reality, nothing more.
 
 =====================================================================
 ## ROADMAP
-=====================================================================
 
 [X] Disable DNS resolution
 [X] Toggle scan timestamp tracking
@@ -259,7 +248,6 @@ The tool reflects observed reality, nothing more.
 
 =====================================================================
 ## CONTRIBUTING
-=====================================================================
 
 Contributions are welcome.
 
@@ -271,7 +259,6 @@ Please ensure:
 
 =====================================================================
 ## SUPPORT
-=====================================================================
 
 For issues or improvements:
 1) Check the Wiki
