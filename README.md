@@ -11,7 +11,6 @@ This project is designed as a long-running scheduler that continuously:
 The design favors correctness, traceability, and safe automation over visual output.
 
 
-=====================================================================
 ## OVERVIEW
 
 netbox-nmap-scan performs ICMP discovery scans (nmap -sn) against all
@@ -24,7 +23,6 @@ Each prefix is handled independently and stored in its own folder,
 allowing safe concurrency, restartability, and forensic inspection.
 
 
-=====================================================================
 ## KEY FEATURES
 
 - Automatic discovery of active IP addresses using nmap
@@ -40,7 +38,6 @@ allowing safe concurrency, restartability, and forensic inspection.
 - Automatic cleanup of historical scan artifacts
 
 
-=====================================================================
 ## IMPORTANT BEHAVIORAL GUARANTEES
 
 1) ipam_addresses.csv IS ALWAYS LATEST
@@ -75,7 +72,6 @@ This ensures:
 - No partial or corrupted state is reused
 
 
-=====================================================================
 ## DIRECTORY STRUCTURE
 
 project_root/
@@ -102,7 +98,6 @@ project_root/
         └── ...
 
 
-=====================================================================
 ## PREFIX FOLDER CONTENT
 
 prefix.info
@@ -122,7 +117,6 @@ ipam_addresses.csv
 - Deleted automatically if not refreshed
 
 
-=====================================================================
 ## NETBOX CONFIGURATION
 
 TAGS
@@ -143,7 +137,6 @@ scantime (DateTime)
 - Controlled via enable_scantime in var.ini
 
 
-=====================================================================
 ## CONFIGURATION (var.ini)
 
 Example configuration:
@@ -200,7 +193,6 @@ LOGGING OPTIONS
 - backup_count controls retention (in days)
 
 
-=====================================================================
 ## USAGE
 
 Run the scheduler:
@@ -212,7 +204,6 @@ Recommended:
 - Ensure nmap is available on PATH
 
 
-=====================================================================
 ## PERFORMANCE NOTES
 
 - Scan duration scales with number and size of prefixes
@@ -223,7 +214,6 @@ Recommended:
   - Exclude irrelevant prefixes via tag
 
 
-=====================================================================
 ## WHAT THIS TOOL DOES NOT DO
 
 - It does NOT enumerate unused IPs
@@ -234,7 +224,6 @@ Recommended:
 The tool reflects observed reality, nothing more.
 
 
-=====================================================================
 ## ROADMAP
 
 [X] Disable DNS resolution
@@ -246,7 +235,6 @@ The tool reflects observed reality, nothing more.
 [ ] Native systemd unit file
 
 
-=====================================================================
 ## CONTRIBUTING
 
 Contributions are welcome.
@@ -257,7 +245,6 @@ Please ensure:
 - Netbox safety is preserved (no destructive assumptions)
 
 
-=====================================================================
 ## SUPPORT
 
 For issues or improvements:
