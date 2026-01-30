@@ -75,27 +75,49 @@ This ensures:
 ## DIRECTORY STRUCTURE
 
 project_root/
+
 ├── main.py
+
 ├── network_scan.py
+
 ├── scan_processor.py
+
 ├── netbox_import.py
+
 ├── netbox_export.py
+
 ├── netbox_connection.py
+
 ├── logging_utils.py
+
 ├── var.ini
+
 ├── logs/
+
 │   ├── scheduler.log
+
 │   ├── scheduler.error.log
+
 │   ├── netbox_import.log
+
 │   └── ...
+
 └── PREFIXES/
+
     ├── 10.0.0.0_24/
+    
     │   ├── prefix.info
+    
     │   ├── nmap_results_2025-01-28_22-00-00.csv
+    
     │   ├── nmap_results_2025-01-29_02-00-00.csv
+    
     │   └── ipam_addresses.csv
+    
     └── 192.168.1.0_24__VRF-CORP/
+    
         └── ...
+        
 
 
 ## PREFIX FOLDER CONTENT
