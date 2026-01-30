@@ -41,7 +41,7 @@ allowing safe concurrency, restartability, and forensic inspection.
 ## IMPORTANT BEHAVIORAL GUARANTEES
 
 1) ipam_addresses.csv IS ALWAYS LATEST
-------------------------------------
+
 - ipam_addresses.csv is DELETED at the start of each scheduler cycle.
 - It is only recreated when a prefix is successfully scanned.
 - This guarantees the file is never stale if:
@@ -51,9 +51,9 @@ allowing safe concurrency, restartability, and forensic inspection.
 
 If ipam_addresses.csv exists, it represents the most recent valid state.
 
-
+------------------------------------
 2) SCAN HISTORY IS PRESERVED BY COUNT (NOT TIME)
-------------------------------------------------
+
 - Each prefix folder keeps ONLY the latest N scan files:
   nmap_results_<YYYY-MM-DD_HH-MM-SS>.csv
 - Default: keep last 4 scans per prefix
@@ -64,9 +64,9 @@ This ensures:
 - bounded disk usage
 - predictable behavior regardless of scan frequency
 
-
-3) SAFE RESTARTS
 ----------------
+3) SAFE RESTARTS
+
 - The scheduler can be stopped and restarted at any time
 - Prefix folders and scan history are preserved
 - No partial or corrupted state is reused
@@ -120,7 +120,7 @@ ipam_addresses.csv
 ## NETBOX CONFIGURATION
 
 TAGS
-----
+
 Required:
 - autoscan
   Used to tag IP addresses managed by this tool
@@ -129,9 +129,9 @@ Optional:
 - Disable Automatic Scanning
   Apply to prefixes to exclude them from scanning
 
-
-CUSTOM FIELDS (OPTIONAL)
 -----------------------
+CUSTOM FIELDS (OPTIONAL)
+
 scantime (DateTime)
 - Stores last scan time per IP
 - Controlled via enable_scantime in var.ini
@@ -160,9 +160,9 @@ root_level = DEBUG
 file_level = INFO
 console_level = INFO
 
-
-SCAN OPTIONS EXPLAINED
 ---------------------
+SCAN OPTIONS EXPLAINED
+
 enable_dns
 - Enables DNS resolution during nmap scans
 
@@ -183,9 +183,9 @@ nmap_results_keep_last
 - Number of scan history files preserved per prefix
 - Minimum enforced: 2
 
-
-LOGGING OPTIONS
 ---------------
+LOGGING OPTIONS
+
 - Logs are rotated daily
 - Two files per application:
   - <app>.log        (INFO and above)
