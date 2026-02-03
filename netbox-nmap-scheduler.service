@@ -1,0 +1,50 @@
+[Unit]
+Description=NetBox Nmap Scan Scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Run as dedicated user/group (recommended)
+User=netboxscan
+Group=netboxscan
+
+# Project directory (contains main.py and var.ini)
+WorkingDirectory=/opt/netbox-nmap-scheduler
+
+# Optional: load environment variables (proxy, PATH additions, etc.)
+EnvironmentFile=-/etc/default/netbox-nmap-scheduler
+
+# If you use a virtualenv, point ExecStart to it
+ExecStart=/opt/netbox-nmap-scheduler/venv/bin/python /opt/netbox-nmap-scheduler/main.py
+
+# Restart policy (good for long-running schedulers)
+Restart=always
+RestartSec=10
+
+# Logging to journald
+StandardOutput=journal
+StandardError=journal
+
+# Hardening (safe defaults; loosen if your script needs more)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/netbox-nmap-scheduler
+# Allow creating raw sockets for nmap (if needed):
+# - if nmap is called with raw sockets, CAP_NET_RAW is typically required
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+
+# If nmap uses ping/icmp or needs extra permissions, you may need:
+# AmbientCapabilities=CAP_NET_RAW
+# Or ensure /usr/bin/nmap has the needed setcap.
+
+# Graceful stop
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

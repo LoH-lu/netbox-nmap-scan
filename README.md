@@ -219,7 +219,7 @@ Recommended:
 
 - It does NOT enumerate unused IPs
 - It does NOT assign IPs arbitrarily
-- It does NOT override DHCP-managed IP metadata
+- It does NOT override DHCP-managed IP data
 - It does NOT assume scan success means network correctness
 
 The tool reflects observed reality, nothing more.
@@ -232,7 +232,7 @@ The tool reflects observed reality, nothing more.
 [X] Centralized logging with rotation
 [X] Automatic scan artifact cleanup
 [ ] Optional DNS server override
-[ ] Prefix-level scan tuning
+[X] Prefix-level scan tuning
 [ ] Native systemd unit file
 
 
@@ -254,3 +254,22 @@ For issues or improvements:
 3) Submit a Pull Request
 
 This project prioritizes correctness over convenience.
+
+
+
+
+
+
+
+
+
+
+FOR WIKI:
+nano /etc/systemd/system/netbox-nmap-scheduler.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now netbox-nmap-scheduler.service
+sudo systemctl status netbox-nmap-scheduler.service
+journalctl -u netbox-nmap-scheduler.service -f
+sudo useradd --system --home /opt/netbox-nmap-scheduler --shell /usr/sbin/nologin netboxscan
+sudo chown -R netboxscan:netboxscan /opt/netbox-nmap-scheduler
+Put all script file in /opt/netbox-nmap-scheduler/
