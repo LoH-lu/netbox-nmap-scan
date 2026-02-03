@@ -1,14 +1,44 @@
 #!/usr/bin/env python3
 """netbox_export.py
 
-Export IPAM prefixes from Netbox to a CSV file `ipam_prefixes.csv`.
+Export IPAM prefixes from NetBox to a CSV file.
 
-- As a module: import and call `get_ipam_prefixes(netbox_instance)`.
-- As a script: reads credentials from var.ini, connects to Netbox, writes CSV.
+This module supports two usage patterns:
 
-Logging:
-- When run as a script, logging is configured via logging_utils and var.ini [logging].
-- When imported, it inherits logging configuration from the caller.
+1) Library usage (imported)
+   - Call :func:`get_ipam_prefixes` with an existing ``pynetbox.api`` instance.
+   - Call :func:`write_to_csv` to serialize the returned prefix objects to CSV.
+
+2) Script usage (executed directly)
+   - Reads NetBox credentials from ``var.ini`` in the same folder as this script.
+   - Establishes a NetBox connection (via :mod:`netbox_connection`).
+   - Writes ``ipam_prefixes.csv`` next to this script.
+
+Output format
+-------------
+The CSV contains one row per prefix with the following columns:
+
+- Prefix: CIDR string (e.g. ``10.0.0.0/24``)
+- VRF: VRF name or ``N/A``
+- Status: NetBox status value (e.g. ``active``) or ``N/A``
+- Tags: Comma-separated list of tag names
+- Tenant: Tenant name or ``N/A``
+
+Logging
+-------
+- When run as a script, logging is configured via :func:`logging_utils.configure_logging`
+  using the optional ``[logging]`` section in ``var.ini``.
+- When imported, this module does not configure handlers; it uses the logger created by
+  the caller's logging configuration.
+
+Configuration file (var.ini)
+----------------------------
+Expected structure::
+
+    [credentials]
+    url = https://netbox.example.org
+    token = <API_TOKEN>
+
 """
 
 from __future__ import annotations
@@ -18,7 +48,7 @@ import csv
 import logging
 import os
 import sys
-from typing import List
+from typing import List, Sequence, Tuple
 
 import pynetbox
 
@@ -30,8 +60,17 @@ logger = logging.getLogger(__name__)
 CSV_HEADERS = ["Prefix", "VRF", "Status", "Tags", "Tenant"]
 
 
-def load_config() -> tuple[str, str]:
-    """Load Netbox URL/token from var.ini."""
+def load_config() -> Tuple[str, str]:
+    """Load NetBox URL and token from ``var.ini``.
+
+    The function reads a local ``var.ini`` stored in the same directory as this script.
+
+    Returns:
+        A tuple ``(url, token)``.
+
+    Raises:
+        RuntimeError: If the file is missing/unreadable or required keys are absent.
+    """
     config_path = os.path.join(SCRIPT_DIR, "var.ini")
 
     config = configparser.ConfigParser()
@@ -47,8 +86,19 @@ def load_config() -> tuple[str, str]:
 
 
 def get_ipam_prefixes(netbox_instance: pynetbox.api) -> List[object]:
-    """Retrieve all IPAM prefixes from Netbox."""
-    logger.info("Retrieving IPAM prefixes from Netbox")
+    """Retrieve all IPAM prefixes from NetBox.
+
+    Args:
+        netbox_instance: Authenticated NetBox client.
+
+    Returns:
+        A list of prefix records as returned by ``pynetbox``. The exact record type is a
+        ``pynetbox`` Record, so we type it as ``object`` to avoid tight coupling.
+
+    Raises:
+        Exception: Propagates any exception raised by the underlying API call.
+    """
+    logger.info("Retrieving IPAM prefixes from NetBox")
     try:
         prefixes = list(netbox_instance.ipam.prefixes.all())
         logger.info("Retrieved %d prefix(es)", len(prefixes))
@@ -58,8 +108,19 @@ def get_ipam_prefixes(netbox_instance: pynetbox.api) -> List[object]:
         raise
 
 
-def write_to_csv(prefixes: List[object], filename: str) -> None:
-    """Write IPAM prefixes to a CSV file in SCRIPT_DIR."""
+def write_to_csv(prefixes: Sequence[object], filename: str) -> None:
+    """Write prefixes to a CSV file.
+
+    Args:
+        prefixes: Iterable of prefix objects (typically from :func:`get_ipam_prefixes`).
+        filename: Output filename (relative to ``SCRIPT_DIR``).
+
+    Side effects:
+        Creates/overwrites the CSV file at ``SCRIPT_DIR/filename``.
+
+    Raises:
+        Exception: If the file cannot be written or prefix objects are missing attributes.
+    """
     file_path = os.path.join(SCRIPT_DIR, filename)
     logger.info("Writing CSV export to %s", file_path)
 
@@ -69,7 +130,8 @@ def write_to_csv(prefixes: List[object], filename: str) -> None:
             writer.writerow(CSV_HEADERS)
 
             for p in prefixes:
-                tags = []
+                # Tags can come back as objects, dicts, or None depending on NetBox/pynetbox versions.
+                tags: List[str] = []
                 for t in getattr(p, "tags", []) or []:
                     if isinstance(t, dict):
                         tags.append(t.get("name") or t.get("slug") or str(t))
@@ -90,16 +152,21 @@ def write_to_csv(prefixes: List[object], filename: str) -> None:
 
 
 def main() -> None:
+    """CLI entrypoint.
+
+    Reads configuration, connects to NetBox, exports prefixes to ``ipam_prefixes.csv``.
+    Exits with status code 1 on failure.
+    """
     from logging_utils import configure_logging
 
     configure_logging(app_name="netbox_export", script_dir=SCRIPT_DIR)
-    logger.info("Starting Netbox IPAM export")
+    logger.info("Starting NetBox IPAM export")
 
     try:
         url, token = load_config()
-        logger.info("Connecting to Netbox...")
+        logger.info("Connecting to NetBox...")
         nb = netbox_connection.connect_to_netbox(url, token)
-        logger.info("Connected to Netbox")
+        logger.info("Connected to NetBox")
 
         prefixes = get_ipam_prefixes(nb)
         if prefixes:

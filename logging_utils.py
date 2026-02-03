@@ -3,22 +3,42 @@
 
 Centralized logging configuration for this project.
 
-Standard log files (in <log_dir>):
-- <app_name>.log        : INFO and above (rotated daily)
-- <app_name>.error.log  : ERROR and above (rotated daily)
+This project can run as:
+- a long-running scheduler (``main.py``), and/or
+- short-lived helper scripts (e.g. ``netbox_export.py``, ``netbox_import.py``).
 
-Rotation:
-- TimedRotatingFileHandler, rotated at midnight (local time by default)
-- backup_count controls how many rotated files are kept
+To keep logs consistent across entrypoints, this module provides a single
+:func:`configure_logging` function that sets up:
 
-Configuration source:
-- var.ini [logging] section (optional). If missing, sensible defaults are used.
+- Daily-rotated log files (midnight rotation)
+- Separate error log file (ERROR and above)
+- Optional console logging
+- A consistent log format (timestamps, module, file:line)
 
-Recommended usage:
-- In the main entrypoint (e.g., scheduler main.py), call configure_logging(...)
-  once so that all imported modules inherit the same handlers.
-- Library modules should *not* configure handlers; they should only do:
-      logger = logging.getLogger(__name__)
+Log files
+---------
+Logs are created in ``<log_dir>`` (default: ``logs`` under the script directory):
+
+- ``<app_name>.log``       : INFO and above (or configured level)
+- ``<app_name>.error.log`` : ERROR and above
+
+Configuration source (var.ini)
+------------------------------
+If present, values are read from the ``[logging]`` section of ``var.ini``::
+
+    [logging]
+    log_dir = logs
+    backup_count = 14
+    root_level = DEBUG
+    file_level = INFO
+    console_level = INFO
+
+Design notes
+------------
+- Library modules should *not* attach handlers. They should only do:
+  ``logger = logging.getLogger(__name__)``.
+- ``configure_logging`` is safe to call more than once: it avoids duplicating handlers.
+  This matters if an entrypoint imports another script that also calls this function.
 """
 
 from __future__ import annotations
@@ -29,6 +49,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 from typing import Optional, Tuple
 
+# Mapping of string levels (as found in var.ini) to logging module constants.
 _LEVEL_MAP = {
     "CRITICAL": logging.CRITICAL,
     "ERROR": logging.ERROR,
@@ -40,18 +61,35 @@ _LEVEL_MAP = {
 
 
 def _parse_level(value: str, default: int) -> int:
+    """Parse a log level string.
+
+    Args:
+        value: e.g. "INFO", "debug", "WARNING". Empty/unknown -> default.
+        default: Level constant to return when parsing fails.
+
+    Returns:
+        A logging level constant (e.g. ``logging.INFO``).
+    """
     if not value:
         return default
     return _LEVEL_MAP.get(value.strip().upper(), default)
 
 
 def _read_logging_config(var_ini_path: str) -> Tuple[str, int, int, int, int]:
-    """Read logging config from var.ini.
+    """Read logging configuration from ``var.ini``.
+
+    Args:
+        var_ini_path: Absolute path to ``var.ini``.
 
     Returns:
-        (log_dir, backup_count, root_level, file_level, console_level)
+        A tuple ``(log_dir, backup_count, root_level, file_level, console_level)``.
+
+    Notes:
+        - Missing ``var.ini`` or missing ``[logging]`` section are not errors.
+          Defaults are returned in that case.
+        - Invalid integer/level values are ignored and replaced with defaults.
     """
-    # Defaults
+    # Defaults (used if var.ini is absent or incomplete).
     log_dir = "logs"
     backup_count = 14
     root_level = logging.DEBUG
@@ -90,31 +128,43 @@ def configure_logging(
     var_ini_name: str = "var.ini",
     logger_name: Optional[str] = None,
 ) -> logging.Logger:
-    """Configure logging (daily rotation, standardized filenames).
+    """Configure project logging (daily rotation, standardized filenames).
+
+    Call this once from the main entrypoint so that all imported modules inherit the
+    same handlers.
 
     Args:
-        app_name: base filename (e.g. 'scheduler', 'netbox_import').
-        script_dir: directory containing var.ini and logs directory.
-        var_ini_name: configuration filename (default: var.ini).
-        logger_name: which logger to attach handlers to. None => root logger.
+        app_name: Base filename for logs (e.g. ``scheduler`` or ``netbox_import``).
+        script_dir: Directory containing ``var.ini`` and the log directory.
+        var_ini_name: Configuration filename (default: ``var.ini``).
+        logger_name:
+            Which logger to configure.
+            - ``None`` (default) configures the *root* logger. This is usually what you want
+              for applications so every module inherits handlers.
+            - A string configures a named logger only.
 
     Returns:
-        The configured logger instance.
+        The configured logger object (root logger if ``logger_name`` is None).
 
-    Notes:
-        - Safe to call multiple times; handlers are not duplicated.
-        - When configuring the root logger, all modules will inherit handlers.
+    Behavior:
+        - Creates the log directory if missing.
+        - Adds a daily rotating file handler for the main log.
+        - Adds a daily rotating file handler for error log (ERROR+).
+        - Adds a console stream handler.
+        - Avoids duplicating handlers if called multiple times.
     """
     var_ini_path = os.path.join(script_dir, var_ini_name)
     log_dir_name, backup_count, root_level, file_level, console_level = _read_logging_config(var_ini_path)
 
+    # Allow either an absolute log_dir in var.ini, or a path relative to script_dir.
     log_dir = log_dir_name if os.path.isabs(log_dir_name) else os.path.join(script_dir, log_dir_name)
     os.makedirs(log_dir, exist_ok=True)
 
     logger = logging.getLogger(logger_name)  # root if None
     logger.setLevel(root_level)
 
-    # Avoid duplicate handlers (important when imported and called multiple times).
+    # Prevent handler duplication:
+    # We key on (type, baseFilename, level). For StreamHandler baseFilename is None.
     existing_keys = {(type(h), getattr(h, "baseFilename", None), h.level) for h in logger.handlers}
 
     file_fmt = logging.Formatter(
@@ -126,6 +176,7 @@ def configure_logging(
     err_path = os.path.join(log_dir, f"{app_name}.error.log")
 
     def _add_timed_handler(path: str, level: int) -> None:
+        """Attach a TimedRotatingFileHandler if not already present."""
         h = TimedRotatingFileHandler(
             filename=path,
             when="midnight",
@@ -133,7 +184,7 @@ def configure_logging(
             backupCount=backup_count,
             encoding="utf-8",
             utc=False,
-            delay=True,
+            delay=True,  # file opened on first emit; avoids creating empty logs at import time
         )
         h.setLevel(level)
         h.setFormatter(file_fmt)

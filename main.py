@@ -1,26 +1,83 @@
 #!/usr/bin/env python3
 """main.py
 
-Netbox Nmap scan scheduler (concurrent, per-prefix folders).
+NetBox Nmap scan scheduler (concurrent, per-prefix folders).
 
-Legacy behavior (always kept):
-- Prefixes tagged "Disable Automatic Scanning" are skipped.
+High-level pipeline
+-------------------
+This script is the long-running orchestrator that keeps NetBox IP Address records aligned
+with periodic network discovery.
 
-Opt-in behavior (var.ini):
-- use_scanrm_cf = true:
-    - Netbox Prefix custom field scanrm (boolean):
-        if true => prefix is NOT scanned
-- per_prefix_scan_interval = true:
-    - Netbox Prefix custom field scaninterval (hours):
-        if set (>0) => overrides scan_interval_hours for that prefix
-If scaninterval is missing/invalid => fallback to scan_interval_hours.
+For each scan cycle it:
 
-prefix.info stores:
-- prefix=<CIDR>
-- scan_interval_hours=<effective hours>
+1) Loads configuration from ``var.ini``.
+2) Connects to NetBox and retrieves eligible prefixes.
+3) Ensures a folder exists per (prefix, VRF) under ``PREFIXES/``.
+4) Decides which prefixes are *due* for scanning (based on the last scan timestamp and
+   the effective scan interval).
+5) Runs prefix scans concurrently using a thread pool:
+      - Nmap discovery (``network_scan``)
+      - Merge with previous scan and produce ``ipam_addresses.csv`` (``scan_processor``)
+      - Import into NetBox (``netbox_import``)
+6) Performs housekeeping:
+      - Deletes stale ``ipam_addresses.csv`` in prefix folders.
+      - Keeps only the most recent ``nmap_results_*.csv`` files (configurable).
 
-Backward compatible:
-- if prefix.info only contains a CIDR (single line), it is treated as legacy and will be rewritten.
+Prefix eligibility rules
+------------------------
+A prefix is scanned only when:
+- NetBox prefix status is ``active``; and
+- It does *not* have the tag ``Disable Automatic Scanning``; and
+- Optional custom-field rules (controlled via ``var.ini``) do not exclude it.
+
+Optional behavior toggles (var.ini)
+-----------------------------------
+Under ``[scan_options]``:
+
+- ``use_scanrm_cf = true``:
+    Uses the NetBox prefix custom field ``scanrm`` (boolean).
+    If truthy => the prefix is excluded from scanning.
+
+- ``per_prefix_scan_interval = true``:
+    Uses the NetBox prefix custom field ``scaninterval`` (hours).
+    If set to a valid >0 integer => overrides the global scan interval for that prefix.
+
+If ``scaninterval`` is missing or invalid, the global ``scan_interval_hours`` is used.
+
+On-disk state (PREFIXES/<prefix>__<vrf>/)
+-----------------------------------------
+Each prefix folder contains:
+
+- ``prefix.info``:
+    Stores the canonical prefix and the effective scan interval used for due decisions.
+    Format::
+
+        prefix=<CIDR>
+        scan_interval_hours=<hours>
+
+    Legacy support:
+        Older deployments stored a single CIDR line only. Those files are detected and
+        automatically migrated to the key/value format.
+
+- ``nmap_results_<timestamp>.csv``:
+    Raw scan observations produced by :mod:`network_scan`.
+
+- ``ipam_addresses.csv``:
+    NetBox-ready CSV produced by :mod:`scan_processor` (deleted during cleanup to avoid
+    re-importing stale data).
+
+Concurrency and safety
+----------------------
+- Scans are executed via a ``ThreadPoolExecutor`` (worker count configurable).
+- A guard set (``_IN_PROGRESS``) prevents the same (prefix, VRF) from being scanned twice
+  concurrently if it appears multiple times in a cycle.
+- File writes inside scanning and processing modules handle their own local locking.
+
+Logging
+-------
+Logging is configured at import time for this script via :func:`logging_utils.configure_logging`.
+All other modules use ``logging.getLogger(__name__)`` and inherit these handlers.
+
 """
 
 from __future__ import annotations
@@ -402,6 +459,19 @@ def precreate_prefix_folders(prefixes: List[Dict[str, str]]) -> None:
 
 
 def _prefix_task_key(prefix: str, vrf: str) -> str:
+    """Build a stable in-memory key for in-progress scan suppression.
+
+    The scheduler may iterate over the prefix list multiple times within a cycle, and
+    worker threads run concurrently. This key is used in ``_IN_PROGRESS`` to ensure that
+    at most one worker per (prefix, VRF) is active at a time.
+
+    Args:
+        prefix: CIDR string.
+        vrf: VRF name (or 'N/A').
+
+    Returns:
+        A string key in the form ``<prefix>__<vrf>``.
+    """
     return f"{prefix}__{vrf or 'N/A'}"
 
 
