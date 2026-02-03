@@ -31,7 +31,9 @@ NMAP_TIMEOUT_SECONDS = 300
 _FILE_LOCK = threading.Lock()
 OUTPUT_FIELDNAMES = ["address", "dns_name", "status", "tags", "tenant", "VRF", "scantime"]
 
-_NMAP_REPORT_RE = re.compile(r"^Nmap scan report for (?:(?P<host>.+?)\s+\((?P<ip>.+?)\)|(?P<ip_only>.+))$")
+_NMAP_REPORT_RE = re.compile(
+    r"^Nmap scan report for (?:(?P<host>.+?)\s+\((?P<ip>.+?)\)|(?P<ip_only>.+))$"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +58,26 @@ def _read_scan_options() -> tuple[bool, bool]:
 
 
 def _ensure_prefix_info(folder: str, prefix: str) -> None:
+    """
+    IMPORTANT:
+    Do NOT overwrite prefix.info.
+
+    The scheduler (main.py) owns prefix.info and may store extra metadata
+    like scan_interval_hours. If we overwrite here, we destroy that metadata.
+    """
     os.makedirs(folder, exist_ok=True)
-    with open(os.path.join(folder, "prefix.info"), "w", encoding="utf-8") as f:
-        f.write(prefix.strip() + "\n")
+    info_path = os.path.join(folder, "prefix.info")
+
+    # If it exists, leave it untouched.
+    if os.path.exists(info_path):
+        return
+
+    # If missing, create a minimal file (scheduler will enrich/migrate it).
+    try:
+        with open(info_path, "w", encoding="utf-8") as f:
+            f.write(f"prefix={prefix.strip()}\n")
+    except Exception:
+        logger.warning("Failed to create %s", info_path, exc_info=True)
 
 
 def _ensure_scan_csv(folder: str, ts: datetime) -> str:

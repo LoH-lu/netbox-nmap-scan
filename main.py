@@ -3,26 +3,24 @@
 
 Netbox Nmap scan scheduler (concurrent, per-prefix folders).
 
-Per scheduler cycle:
-1) Connect to Netbox
-2) Fetch *active* prefixes
-   - Prefixes tagged "Disable Automatic Scanning" are skipped
-3) Pre-create ALL prefix folders under ./PREFIXES/ and write prefix.info for each
-4) Cleanup per-prefix artifacts:
-   - keep only the latest N scan CSVs (nmap_results_*.csv), delete the rest
-   - delete ipam_addresses.csv so it can never be stale when a prefix isn't scanned
-5) Schedule concurrent scans only for prefixes that are due (per scan_interval_hours)
-6) For each scanned prefix:
-   - network_scan writes nmap_results_<timestamp>.csv (header-only if no hosts)
-   - scan_processor writes ipam_addresses.csv (latest computed view)
-   - netbox_import imports per-prefix ipam_addresses.csv into Netbox
+Legacy behavior (always kept):
+- Prefixes tagged "Disable Automatic Scanning" are skipped.
 
-Configuration (var.ini):
-[scan_options]
-scan_interval_hours = 4
-scheduler_sleep_seconds = 300
-scan_max_workers = 5
-nmap_results_keep_last = 4
+Opt-in behavior (var.ini):
+- use_scanrm_cf = true:
+    - Netbox Prefix custom field scanrm (boolean):
+        if true => prefix is NOT scanned
+- per_prefix_scan_interval = true:
+    - Netbox Prefix custom field scaninterval (hours):
+        if set (>0) => overrides scan_interval_hours for that prefix
+If scaninterval is missing/invalid => fallback to scan_interval_hours.
+
+prefix.info stores:
+- prefix=<CIDR>
+- scan_interval_hours=<effective hours>
+
+Backward compatible:
+- if prefix.info only contains a CIDR (single line), it is treated as legacy and will be rewritten.
 """
 
 from __future__ import annotations
@@ -48,16 +46,14 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PREFIXES_DIR = os.path.join(SCRIPT_DIR, "PREFIXES")
 os.makedirs(PREFIXES_DIR, exist_ok=True)
 
-# Configure root logger once so all modules inherit consistent handlers.
 configure_logging(app_name="scheduler", script_dir=SCRIPT_DIR)
 logger = logging.getLogger(__name__)
 
-# Guard to avoid scheduling the same prefix concurrently.
 _IN_PROGRESS: set[str] = set()
 _IN_PROGRESS_LOCK = threading.Lock()
 
 
-def load_scheduler_config() -> Tuple[str, str, int, int, int, int]:
+def load_scheduler_config() -> Tuple[str, str, int, bool, bool, int, int, int]:
     """Load scheduler configuration from var.ini."""
     config_path = os.path.join(SCRIPT_DIR, "var.ini")
 
@@ -69,19 +65,25 @@ def load_scheduler_config() -> Tuple[str, str, int, int, int, int]:
     token = config["credentials"]["token"]
 
     scan_interval_hours = config.getint("scan_options", "scan_interval_hours", fallback=4)
+    per_prefix_scan_interval = config.getboolean("scan_options", "per_prefix_scan_interval", fallback=False)
+
+    # Independent switch for scanrm custom field
+    use_scanrm_cf = config.getboolean("scan_options", "use_scanrm_cf", fallback=False)
+
     scheduler_sleep_seconds = config.getint("scan_options", "scheduler_sleep_seconds", fallback=300)
     scan_max_workers = config.getint("scan_options", "scan_max_workers", fallback=5)
 
-    # New: keep only the latest N scan CSVs per prefix
     keep_last = config.getint("scan_options", "nmap_results_keep_last", fallback=4)
 
     return (
         url,
         token,
         max(1, scan_interval_hours),
+        bool(per_prefix_scan_interval),
+        bool(use_scanrm_cf),
         max(5, scheduler_sleep_seconds),
         max(1, scan_max_workers),
-        max(2, keep_last),  # keep at least 2 so diff logic can work
+        max(2, keep_last),
     )
 
 
@@ -94,7 +96,47 @@ def sanitize_prefix_folder_name(prefix: str, vrf: str) -> str:
     return folder.replace(os.sep, "_")
 
 
-def get_active_prefixes(netbox_instance) -> List[Dict[str, str]]:
+def _parse_bool(value) -> bool:
+    """Best-effort boolean coercion for Netbox custom field values."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    s = str(value).strip().lower()
+    return s in {"1", "true", "yes", "y", "on"}
+
+
+def _parse_interval_hours(value) -> int | None:
+    """Best-effort int hours coercion. Returns None if missing/invalid."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            iv = int(value)
+            return iv if iv > 0 else None
+        except Exception:
+            return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        iv = int(float(s))
+        return iv if iv > 0 else None
+    except Exception:
+        return None
+
+
+def get_active_prefixes(
+    netbox_instance,
+    *,
+    per_prefix_scan_interval: bool,
+    use_scanrm_cf: bool,
+    default_scan_interval_hours: int,
+) -> List[Dict[str, str]]:
     """Retrieve prefixes eligible for scanning."""
     logger.info("Retrieving prefixes from Netbox")
     prefixes = netbox_export.get_ipam_prefixes(netbox_instance)
@@ -109,48 +151,86 @@ def get_active_prefixes(netbox_instance) -> List[Dict[str, str]]:
         if "Disable Automatic Scanning" in tag_names:
             continue
 
+        cf = getattr(p, "custom_fields", None) or {}
+
+        if use_scanrm_cf and _parse_bool(cf.get("scanrm")):
+            continue
+
+        interval_hours = int(default_scan_interval_hours)
+        if per_prefix_scan_interval:
+            per_val = _parse_interval_hours(cf.get("scaninterval"))
+            if per_val is not None:
+                interval_hours = int(per_val)
+
         tenant_name = p.tenant.name if getattr(p, "tenant", None) else "N/A"
         vrf_name = p.vrf.name if getattr(p, "vrf", None) else "N/A"
-        active.append({"prefix": p.prefix, "tenant": tenant_name, "vrf": vrf_name})
+        active.append(
+            {
+                "prefix": p.prefix,
+                "tenant": tenant_name,
+                "vrf": vrf_name,
+                "interval_hours": int(interval_hours),
+            }
+        )
 
     logger.info("Active prefixes eligible for scan: %d", len(active))
     return active
 
 
-def write_prefix_info(prefix_dir: str, prefix: str) -> None:
-    """Write/overwrite prefix.info with the prefix CIDR."""
+def write_prefix_info(prefix_dir: str, prefix: str, interval_hours: int) -> None:
+    """Write/overwrite prefix.info with prefix and effective scan interval."""
     os.makedirs(prefix_dir, exist_ok=True)
-    with open(os.path.join(prefix_dir, "prefix.info"), "w", encoding="utf-8") as f:
-        f.write(prefix.strip() + "\n")
+    info_path = os.path.join(prefix_dir, "prefix.info")
+    with open(info_path, "w", encoding="utf-8") as f:
+        f.write(f"prefix={prefix.strip()}\n")
+        f.write(f"scan_interval_hours={max(1, int(interval_hours))}\n")
 
 
-def precreate_prefix_folders(prefixes: List[Dict[str, str]]) -> None:
-    """Create all prefix folders and prefix.info first."""
-    logger.info("Pre-creating prefix folders and prefix.info files")
+def read_prefix_info(prefix_dir: str) -> tuple[str | None, int | None, bool]:
+    """
+    Read prefix.info.
 
-    created = 0
-    updated = 0
+    Returns: (prefix, interval_hours, is_legacy)
 
-    for p in prefixes:
-        prefix = p["prefix"]
-        vrf = p["vrf"]
+    Supports:
+      - New format:
+          prefix=...
+          scan_interval_hours=...
+      - Legacy format:
+          <CIDR> (single line)
+    """
+    info_path = os.path.join(prefix_dir, "prefix.info")
+    if not os.path.exists(info_path):
+        return None, None, False
 
-        folder_name = sanitize_prefix_folder_name(prefix, vrf)
-        prefix_dir = os.path.join(PREFIXES_DIR, folder_name)
+    try:
+        with open(info_path, "r", encoding="utf-8") as f:
+            lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+    except Exception:
+        return None, None, False
 
-        existed = os.path.isdir(prefix_dir)
-        os.makedirs(prefix_dir, exist_ok=True)
+    if not lines:
+        return None, None, False
 
-        try:
-            write_prefix_info(prefix_dir, prefix)
-        except Exception:
-            logger.error("Failed to write prefix.info for %s (VRF=%s)", prefix, vrf, exc_info=True)
-            continue
+    # Legacy single line CIDR
+    if len(lines) == 1 and "=" not in lines[0]:
+        return lines[0], None, True
 
-        updated += int(existed)
-        created += int(not existed)
+    prefix = None
+    interval = None
+    for ln in lines:
+        if ln.startswith("prefix="):
+            prefix = ln.split("=", 1)[1].strip() or None
+        elif ln.startswith("scan_interval_hours="):
+            raw = ln.split("=", 1)[1].strip()
+            try:
+                iv = int(raw)
+                if iv > 0:
+                    interval = iv
+            except Exception:
+                pass
 
-    logger.info("Prefix folders prepared: created=%d, updated=%d", created, updated)
+    return prefix, interval, False
 
 
 def _parse_scan_timestamp_from_filename(filename: str) -> datetime | None:
@@ -165,10 +245,7 @@ def _parse_scan_timestamp_from_filename(filename: str) -> datetime | None:
 
 
 def _list_scan_files_sorted(prefix_dir: str) -> List[str]:
-    """
-    Return nmap_results_*.csv sorted newest-first using filename timestamp
-    (fallback to mtime if timestamp parsing fails).
-    """
+    """Return nmap_results_*.csv sorted newest-first."""
     candidates: List[str] = []
     for name in os.listdir(prefix_dir):
         if name.startswith("nmap_results_") and name.endswith(".csv"):
@@ -188,19 +265,10 @@ def _list_scan_files_sorted(prefix_dir: str) -> List[str]:
 
 
 def cleanup_prefix_folder(prefix_dir: str, keep_last: int) -> tuple[int, int]:
-    """
-    Cleanup a single prefix folder.
-
-    - Keep only the newest `keep_last` nmap_results_*.csv files
-    - Delete ipam_addresses.csv to avoid stale state when no scan occurs
-
-    Returns:
-        (deleted_scan_files, deleted_ipam_files)
-    """
+    """Cleanup: keep newest N scan CSVs; delete ipam_addresses.csv."""
     deleted_scans = 0
     deleted_ipam = 0
 
-    # 1) Remove stale ipam_addresses.csv (force "latest or nothing")
     ipam_path = os.path.join(prefix_dir, "ipam_addresses.csv")
     if os.path.exists(ipam_path):
         try:
@@ -210,7 +278,6 @@ def cleanup_prefix_folder(prefix_dir: str, keep_last: int) -> tuple[int, int]:
         except OSError:
             logger.warning("Failed to delete %s", ipam_path, exc_info=True)
 
-    # 2) Keep only the newest N scan files
     try:
         scans = _list_scan_files_sorted(prefix_dir)
     except FileNotFoundError:
@@ -267,16 +334,71 @@ def get_last_scan_time(prefix_dir: str) -> datetime | None:
     if ts is not None:
         return ts
 
-    # Fallback: mtime
     return datetime.fromtimestamp(os.path.getmtime(os.path.join(prefix_dir, scans[0])))
 
 
-def is_scan_due(prefix_dir: str, interval_hours: int) -> bool:
-    """Return True if never scanned or interval has elapsed."""
+def is_scan_due(prefix_dir: str, fallback_interval_hours: int, expected_prefix: str | None, expected_interval: int | None) -> bool:
+    """
+    Due decision uses interval stored in prefix.info.
+    Self-heal:
+      - If legacy/missing interval OR mismatch with expected values, rewrite prefix.info.
+    """
+    stored_prefix, stored_interval, is_legacy = read_prefix_info(prefix_dir)
+
+    eff_interval = stored_interval if stored_interval is not None else int(fallback_interval_hours)
+
+    # If we know expected values (from NetBox), keep prefix.info correct and migrate legacy.
+    if expected_prefix is not None and expected_interval is not None:
+        needs_rewrite = (
+            is_legacy
+            or stored_interval is None
+            or stored_prefix is None
+            or stored_prefix != expected_prefix
+            or stored_interval != int(expected_interval)
+        )
+        if needs_rewrite:
+            try:
+                write_prefix_info(prefix_dir, expected_prefix, int(expected_interval))
+                eff_interval = int(expected_interval)
+                if is_legacy or stored_interval is None:
+                    logger.info("Migrated prefix.info to include scan interval for %s", expected_prefix)
+            except Exception:
+                logger.warning("Failed to rewrite prefix.info in %s", prefix_dir, exc_info=True)
+
     last = get_last_scan_time(prefix_dir)
     if last is None:
         return True
-    return datetime.now() - last >= timedelta(hours=interval_hours)
+    return datetime.now() - last >= timedelta(hours=eff_interval)
+
+
+def precreate_prefix_folders(prefixes: List[Dict[str, str]]) -> None:
+    """Create all prefix folders and prefix.info first (including effective interval)."""
+    logger.info("Pre-creating prefix folders and prefix.info files")
+
+    created = 0
+    updated = 0
+
+    for p in prefixes:
+        prefix = p["prefix"]
+        vrf = p["vrf"]
+        interval_hours = int(p.get("interval_hours", 1)) or 1
+
+        folder_name = sanitize_prefix_folder_name(prefix, vrf)
+        prefix_dir = os.path.join(PREFIXES_DIR, folder_name)
+
+        existed = os.path.isdir(prefix_dir)
+        os.makedirs(prefix_dir, exist_ok=True)
+
+        try:
+            write_prefix_info(prefix_dir, prefix, interval_hours)
+        except Exception:
+            logger.error("Failed to write prefix.info for %s (VRF=%s)", prefix, vrf, exc_info=True)
+            continue
+
+        updated += int(existed)
+        created += int(not existed)
+
+    logger.info("Prefix folders prepared: created=%d, updated=%d", created, updated)
 
 
 def _prefix_task_key(prefix: str, vrf: str) -> str:
@@ -288,11 +410,14 @@ def run_scan_for_prefix(url: str, token: str, prefix_info: Dict[str, str]) -> No
     prefix = prefix_info["prefix"]
     tenant = prefix_info["tenant"]
     vrf = prefix_info["vrf"]
+    interval_hours = int(prefix_info.get("interval_hours", 1)) or 1
 
     folder_name = sanitize_prefix_folder_name(prefix, vrf)
     prefix_dir = os.path.join(PREFIXES_DIR, folder_name)
     os.makedirs(prefix_dir, exist_ok=True)
-    write_prefix_info(prefix_dir, prefix)
+
+    # Keep prefix.info up-to-date (including effective interval)
+    write_prefix_info(prefix_dir, prefix, interval_hours)
 
     scan_start = datetime.now()
     logger.info("Starting scan for prefix %s (VRF=%s)", prefix, vrf)
@@ -322,14 +447,25 @@ def main() -> None:
     logger.info("Starting Netbox Nmap scan scheduler")
 
     try:
-        url, token, scan_interval_hours, scheduler_sleep_seconds, scan_max_workers, keep_last = load_scheduler_config()
+        (
+            url,
+            token,
+            scan_interval_hours,
+            per_prefix_scan_interval,
+            use_scanrm_cf,
+            scheduler_sleep_seconds,
+            scan_max_workers,
+            keep_last,
+        ) = load_scheduler_config()
     except Exception:
         logger.error("Failed to load configuration", exc_info=True)
         sys.exit(1)
 
     logger.info(
-        "Config: scan_interval=%dh | sleep=%ds | workers=%d | keep_last_scans=%d",
+        "Config: scan_interval=%dh | per_prefix_scan_interval=%s | use_scanrm_cf=%s | sleep=%ds | workers=%d | keep_last_scans=%d",
         scan_interval_hours,
+        per_prefix_scan_interval,
+        use_scanrm_cf,
         scheduler_sleep_seconds,
         scan_max_workers,
         keep_last,
@@ -344,17 +480,16 @@ def main() -> None:
                 netbox_instance = netbox_connection.connect_to_netbox(url, token)
                 logger.info("Connected to Netbox")
 
-                prefixes = get_active_prefixes(netbox_instance)
+                prefixes = get_active_prefixes(
+                    netbox_instance,
+                    per_prefix_scan_interval=per_prefix_scan_interval,
+                    use_scanrm_cf=use_scanrm_cf,
+                    default_scan_interval_hours=scan_interval_hours,
+                )
 
-                # 1) Ensure all folders exist and have prefix.info
                 precreate_prefix_folders(prefixes)
-
-                # 2) Cleanup:
-                #    - keep only newest N scan files per prefix
-                #    - delete ipam_addresses.csv to prevent stale state
                 cleanup_all_prefix_folders(keep_last)
 
-                # 3) Schedule due scans
                 futures = []
                 scheduled_count = 0
 
@@ -365,7 +500,13 @@ def main() -> None:
                     folder_name = sanitize_prefix_folder_name(prefix, vrf)
                     prefix_dir = os.path.join(PREFIXES_DIR, folder_name)
 
-                    if not is_scan_due(prefix_dir, scan_interval_hours):
+                    # Due decision uses prefix.info and will auto-migrate legacy/missing interval.
+                    if not is_scan_due(
+                        prefix_dir,
+                        scan_interval_hours,
+                        expected_prefix=prefix,
+                        expected_interval=int(p.get("interval_hours", scan_interval_hours)),
+                    ):
                         continue
 
                     key = _prefix_task_key(prefix, vrf)
@@ -376,8 +517,8 @@ def main() -> None:
 
                     fut = executor.submit(run_scan_for_prefix, url, token, p)
                     fut._prefix_key = key  # type: ignore[attr-defined]
-                    fut._prefix = prefix   # type: ignore[attr-defined]
-                    fut._vrf = vrf         # type: ignore[attr-defined]
+                    fut._prefix = prefix  # type: ignore[attr-defined]
+                    fut._vrf = vrf  # type: ignore[attr-defined]
                     futures.append(fut)
                     scheduled_count += 1
 
