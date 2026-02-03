@@ -5,7 +5,6 @@ ARG PLATFORM="linux/amd64"
 ### 1/3 Base stage ##############################################################
 FROM --platform="${PLATFORM}" debian:stable-slim AS base
 
-# Args in base stage are available in all stages that use it
 ARG PYTHON_VERSION="3.12"
 
 WORKDIR /app
@@ -13,8 +12,9 @@ WORKDIR /app
 # Install runtime OS dependencies:
 # - ca-certificates: TLS trust store
 # - nmap: scanner binary
+#
+# Avoid "apt-get upgrade" in container builds for reproducibility.
 RUN apt-get update \
- && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
       nmap \
@@ -59,7 +59,6 @@ WORKDIR /app
 COPY --from=builder /app /app
 
 # Create venv and install Python deps
-# If you removed tqdm/colorama from requirements.txt, this will naturally reflect it.
 RUN uv python list \
  && uv venv --python "${PYTHON_VERSION}" \
  && uv pip install --no-cache-dir -r requirements.txt
@@ -72,7 +71,14 @@ RUN useradd --create-home --home-dir /home/appuser --shell /usr/sbin/nologin app
 
 USER appuser
 
+# Healthcheck (optional): verifies Python can import the entrypoint module
+# Adjust/remove if you prefer no healthcheck.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD /app/.venv/bin/python -c "import runpy; runpy.run_path('/app/main.py', run_name='__main__')" || exit 1
+
 # The app expects /app/var.ini to exist.
 # Provide it by mounting a config file:
 #   docker run --rm -v $(pwd)/var.ini:/app/var.ini:ro netbox-nmap-scan
-CMD ["uv", "run", "main.py"]
+#
+# Use the venv python directly (most explicit / robust).
+CMD ["/app/.venv/bin/python", "/app/main.py"]
