@@ -266,10 +266,13 @@ This project prioritizes correctness over convenience.
 
 FOR WIKI:
 nano /etc/systemd/system/netbox-nmap-scheduler.service
+
 sudo systemctl daemon-reload
+
 sudo systemctl enable --now netbox-nmap-scheduler.service
+
 sudo systemctl status netbox-nmap-scheduler.service
+
 journalctl -u netbox-nmap-scheduler.service -f
-sudo useradd --system --home /opt/netbox-nmap-scheduler --shell /usr/sbin/nologin netboxscan
-sudo chown -R netboxscan:netboxscan /opt/netbox-nmap-scheduler
+
 Put all script file in /opt/netbox-nmap-scheduler/
