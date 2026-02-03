@@ -7,8 +7,8 @@ Wants=network-online.target
 Type=simple
 
 # Run as dedicated user/group (recommended)
-User=netboxscan
-Group=netboxscan
+User=root
+Group=root
 
 # Project directory (contains main.py and var.ini)
 WorkingDirectory=/opt/netbox-nmap-scheduler
